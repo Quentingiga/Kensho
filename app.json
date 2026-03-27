@@ -1,7 +1,14 @@
 {
   "expo": {
-    "name": "solo-leveling-app",
-    "slug": "solo-leveling-app",
+    "name": "Kensho",
+    "slug": "kensho",
+    "androidStatusBar": {
+      "hidden": true,
+      "backgroundColor": "#ffffff"
+    },
+    "androidNavigationBar": {
+      "visible": "sticky-immersive"
+    },
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +26,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.qchesniercore.kensho"
     },
     "web": {
       "output": "static",
@@ -43,6 +51,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "28aad6a2-b226-414a-9135-7b8469b7396d"
+      }
+    },
+    "owner": "qchesnier-core"
   }
 }

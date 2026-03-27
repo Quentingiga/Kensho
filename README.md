@@ -1,50 +1,52 @@
-# Welcome to your Expo app 👋
+# 🗡️ The System - Solo Leveling Habit Tracker
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**"L'Éveil a commencé. Bienvenue dans le Système."**
 
-## Get started
+Une application mobile multiplateforme (iOS & Android) développée en **React Native** (Expo). Ce projet gamifie la productivité et le suivi d'objectifs en transformant la vie réelle en un véritable RPG, inspiré par l'univers de *Solo Leveling*.
 
-1. Install dependencies
+## 🌟 Fonctionnalités Principales
 
-   ```bash
+* **⚔️ Quêtes Quotidiennes (Habitudes) :** Ajoute, gère et valide tes tâches de tous les jours (Sport, Études, Mental). Chaque tâche accomplie te rapporte de l'XP et augmente tes statistiques de base (Force, Agilité, Intelligence...).
+* **🏰 Donjons (Objectifs Long Terme) :** Fixe-toi des objectifs massifs avec une barre de progression en pourcentage. Terminer un donjon rapporte un bonus massif d'XP.
+* **📈 Système de Leveling & Rangs :** Gagne de l'XP pour monter en niveau. Passe du modeste **Rang E** au légendaire **Rang SSS**. Le Système suit également ta série de jours actifs (*Streak*).
+* **🤖 Assistant IA Intégré :** En manque d'inspiration ? Dis au Système ce que tu veux accomplir (ex: "Je veux me remettre en forme"), et l'IA (propulsée par Anthropic/Claude) générera des quêtes sur mesure adaptées à ton niveau.
+* **💾 Sauvegarde Locale :** Toute ta progression est sauvegardée de manière persistante sur ton téléphone via `AsyncStorage`.
+
+## 🛠️ Stack Technique
+
+* **Frontend :** React Native
+* **Framework :** Expo
+* **Stockage :** `@react-native-async-storage/async-storage`
+* **Intelligence Artificielle :** API Anthropic (Claude 3)
+* **Styling :** StyleSheet natif (UI personnalisée type "Gamer/Dark Mode")
+
+## 📱 Captures d'écran
+*(Ajoute tes captures d'écran ici en remplaçant les liens)*
+> 📷 `[Capture du Dashboard]` | `[Capture des Quêtes]` | `[Capture du Level Up]`
+
+
+
+
+## 🛠️ Installation & Configuration
+
+1. Clonez ce dépôt sur votre machine :
+   \`\`\`bash
+   git clone https://github.com/TonPseudo/TonProjet.git
+   cd TonProjet
+   \`\`\`
+
+2. Installez les dépendances :
+   \`\`\`bash
    npm install
-   ```
+   \`\`\`
 
-2. Start the app
+3. **Configuration de l'environnement (IMPORTANT) ⚠️**
+   - Dupliquez le fichier \`.env.example\` et renommez-le en \`.env\`.
+   - Remplissez le fichier \`.env\` avec vos propres clés API (Supabase, Groq).
+   
+   *Astuce Debug :* Pour ne pas avoir à vous connecter à chaque redémarrage de l'app lors du développement, passez \`EXPO_PUBLIC_BYPASS_AUTH=true\` et renseignez des identifiants de test dans le fichier \`.env\`. L'application vous connectera automatiquement en arrière-plan !
 
-   ```bash
+4. Lancez le Système :
+   \`\`\`bash
    npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+   \`\`\`
