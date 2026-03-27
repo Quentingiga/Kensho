@@ -35,7 +35,7 @@ Une application mobile multiplateforme (iOS & Android) développée en **React N
    cd TonProjet
    \`\`\`
 
-2. Installez les dépendances :
+2. Installez les dépendances : 
    \`\`\`bash
    npm install
    \`\`\`
