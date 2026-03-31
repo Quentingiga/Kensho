@@ -33,7 +33,8 @@ export const DCL = { F: "#6b7280", E: "#9ca3af", D: "#34d399", C: "#60a5fa", B: 
 export const DEF_PLAYER = { 
   name: "Chasseur", level: 1, xp: 0, 
   stats: { force: 5, agilite: 5, intelligence: 5, endurance: 5, volonte: 5 }, 
-  streak: 0, lastDate: null, titles: ["Novice Éveillé"] 
+  streak: 0, lastDate: null, titles: ["Novice Éveillé"],
+  activeTitle: "Novice Éveillé"
 };
 
 export const INIT_QUESTS = [

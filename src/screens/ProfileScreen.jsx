@@ -205,6 +205,30 @@ export const ProfileScreen = ({ player, quests, onUpdateProfile }) => {
           </View>
         </View>
 
+        {/* SECTION 1.5 : TITRES DÉBLOQUÉS (NOUVEAU) */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>TITRE ACTIF</Text>
+          </View>
+          <View style={styles.titlesGrid}>
+            {player.titles.map((t, i) => {
+              const isActive = player.activeTitle === t || (!player.activeTitle && i === 0);
+              return (
+                <TouchableOpacity 
+                  key={i} 
+                  activeOpacity={0.7}
+                  onPress={() => onUpdateProfile({ activeTitle: t })}
+                  style={[styles.titleBadge, isActive && styles.titleBadgeActive]}
+                >
+                  <Text style={[styles.titleText, isActive && styles.titleTextActive]}>
+                    {t} {isActive && "✓"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* SECTION 2 : LE RÉCEPTACLE */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -407,5 +431,11 @@ const styles = StyleSheet.create({
   historyItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', padding: 10, borderRadius: 8, marginBottom: 6 },
   historyItemTitle: { color: THEME.text, fontSize: 12, flex: 1, paddingRight: 10 },
   historyItemXp: { color: THEME.vlight, fontSize: 11, fontWeight: 'bold' },
-  historyEmpty: { color: THEME.dim, fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 12 }
+  historyEmpty: { color: THEME.dim, fontSize: 12, fontStyle: 'italic', textAlign: 'center', paddingVertical: 12 },
+
+  titlesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  titleBadge: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.02)' },
+  titleBadgeActive: { borderColor: THEME.gold, backgroundColor: 'rgba(251,191,36,0.1)' },
+  titleText: { color: THEME.dim, fontSize: 13, fontWeight: 'bold' },
+  titleTextActive: { color: THEME.gold },
 });

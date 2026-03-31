@@ -29,6 +29,8 @@ import { AddDungeonModal } from './src/modals/AddDungeonModal';
 import { AIModal } from './src/modals/AIModal';
 import { LevelUpOverlay } from './src/modals/LevelUpOverlay';
 
+import { registerSystemNotifications, schedulePenaltyWarning, cancelSystemWarning } from './src/utils/notifications';
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
@@ -54,6 +56,8 @@ export default function App() {
 
   // --- 0. GESTION DE LA CONNEXION AU CLOUD ---
   useEffect(() => {
+    registerSystemNotifications();
+
     const checkAuth = async () => {
       // 🛠️ MODE DEBUG : Auto-connexion magique pour le dev
       if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') {
@@ -113,7 +117,8 @@ export default function App() {
             dob: dbP.dob, weight: dbP.weight, height: dbP.height,
             sedentary: dbP.sedentary, weakness: dbP.weakness, interests: dbP.interests, chronotype: dbP.chronotype,
             stats: { force: dbP.force, agilite: dbP.agilite, intelligence: dbP.intelligence, volonte: dbP.volonte, endurance: dbP.endurance },
-            titles: dbP.titles || []
+            titles: dbP.titles || [],
+            activeTitle: dbP.active_title || dbP.titles?.[0] || "Novice Éveillé",
           };
         } else {
           p = await stLoad("sl_p", DEF_PLAYER);
@@ -179,7 +184,8 @@ export default function App() {
           dob: player.dob, weight: player.weight, height: player.height,
           sedentary: player.sedentary, weakness: player.weakness, interests: player.interests, chronotype: player.chronotype,
           force: player.stats.force, agilite: player.stats.agilite, intelligence: player.stats.intelligence, volonte: player.stats.volonte, endurance: player.stats.endurance,
-          titles: player.titles, updated_at: new Date()
+          titles: player.titles, updated_at: new Date(),
+          active_title: player.activeTitle,
         });
 
         // 2. Sauvegarde des Quêtes
@@ -222,6 +228,22 @@ export default function App() {
 
     return () => clearTimeout(timer);
   }, [player, quests, dungeons, ready, session]);
+
+  // --- 2.5 SYSTÈME D'AVERTISSEMENT (NOTIFICATIONS) ---
+  useEffect(() => {
+    if (!ready || quests.length === 0) return;
+
+    // On regarde si toutes les quêtes "daily" sont terminées
+    const allDailyDone = quests.filter(q => q.daily).every(q => q.done);
+
+    if (allDailyDone) {
+      // Le joueur a tout fait : le Système le laisse tranquille
+      cancelSystemWarning();
+    } else {
+      // Il reste des choses à faire : le Système prépare la notification pour 21h
+      schedulePenaltyWarning();
+    }
+  }, [quests, ready]);
 
   // --- 3. MÉCANIQUES DE JEU ---
   const gainXP = useCallback((xp, bonus) => {
@@ -335,7 +357,7 @@ export default function App() {
       <StatusBar hidden={true} />
       
       <PagerView style={styles.content} initialPage={0} ref={pagerRef} onPageSelected={(e) => setTab(TABS_ORDER[e.nativeEvent.position])}>
-        <View key="0" style={{ flex: 1 }}><DashboardScreen player={player} /></View>
+        <View key="0" style={{ flex: 1 }}><DashboardScreen player={player} onAI={() => setShowAI(true)} /></View>
         <View key="1" style={{ flex: 1 }}><QuestsScreen quests={quests} player={player} onComplete={completeQuest} onUndo={undoQuest} onDelete={deleteQuest} onAdd={() => setShowAQ(true)} onAI={() => setShowAI(true)} /></View>
         <View key="2" style={{ flex: 1 }}><DungeonsScreen dungeons={dungeons} onUpdate={updateDungeon} onAdd={() => setShowAD(true)} /></View>
         <View key="3" style={{ flex: 1 }}><ProfileScreen player={player} quests={quests} onUpdateProfile={updates => setPlayer(p => ({ ...p, ...updates }))} /></View>
@@ -343,11 +365,18 @@ export default function App() {
 
       <BottomNav active={tab} onChange={handleTabChange} />
 
-      <AutoSystem player={player} quests={quests} onQuestGenerated={addQuest} />
+      <AutoSystem 
+        player={player} 
+        quests={quests} 
+        dungeons={dungeons} 
+        onQuestGenerated={addQuest} 
+        onDungeonGenerated={addDungeon} 
+      />
+
       <PenaltySystem quests={quests} onApplyPenalty={applyPenalty} />
 
       {showAQ && <AddQuestModal onAdd={addQuest} onClose={() => setShowAQ(false)} />}
-      {showAI && <AIModal player={player} quests={quests} dungeons={dungeons} onAdd={addQuest} onClose={() => setShowAI(false)} />}
+      {showAI && <AIModal player={player} quests={quests} dungeons={dungeons} onAdd={addQuest} onDungeonGenerated={addDungeon} onClose={() => setShowAI(false)} />}
       {showAD && <AddDungeonModal onAdd={addDungeon} onClose={() => setShowAD(false)} />}
       {lvlUp && <LevelUpOverlay level={lvlUp} onDone={() => setLvlUp(null)} />}
     </SafeAreaView>

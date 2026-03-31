@@ -5,17 +5,20 @@ import { THEME } from '../constants/theme';
 import { CAT, DXP } from '../constants/gameData';
 import { getRank } from '../utils/helpers';
 
-export const AIModal = ({ player, quests, dungeons, onAdd, onClose }) => {
+export const AIModal = ({ player, quests, dungeons, onAdd, onDungeonGenerated, onClose }) => {
   const [goal, setGoal] = useState("");
   const [loading, setLoading] = useState(false);
   const [suggs, setSuggs] = useState([]);
+  const [projectSugg, setProjectSugg] = useState(null);
+  
+  // Gestion de la sélection
   const [sel, setSel] = useState(new Set());
+  const [projSel, setProjSel] = useState(true);
 
   const getAge = (dobString) => {
     try {
       if (!dobString) return "Inconnu";
       const parts = dobString.split('/');
-      if (parts.length !== 3) return "Inconnu";
       const birthDate = new Date(parts[2], parts[1] - 1, parts[0]);
       const today = new Date();
       let age = today.getFullYear() - birthDate.getFullYear();
@@ -27,136 +30,115 @@ export const AIModal = ({ player, quests, dungeons, onAdd, onClose }) => {
   };
 
   const generate = async () => {
-    setLoading(true); setSuggs([]); setSel(new Set());
+    setLoading(true); setSuggs([]); setProjectSugg(null); setSel(new Set()); setProjSel(true);
     
     try {
       const safeQuests = Array.isArray(quests) ? quests : [];
-      const safeDungeons = Array.isArray(dungeons) ? dungeons : [];
-      
       const age = getAge(player?.dob);
-      const activeDungeons = safeDungeons.filter(d => !d?.done).map(d => d?.title).join(", ") || "Aucun";
-      const recentQuests = safeQuests.filter(q => q?.done).slice(-10).map(q => q?.title).join(", ") || "Aucune";
+      const recentQuests = safeQuests.filter(q => q?.done).slice(-15).map(q => q?.title).join(", ") || "Aucune donnée";
       
-      const s = player?.stats || {};
-      const force = s.force || 5;
-      const agilite = s.agilite || 5;
-      const intelligence = s.intelligence || 5;
-      const volonte = s.volonte || 5;
+      const safeDungeons = Array.isArray(dungeons) ? dungeons : [];
+      const activeDungeonsCount = safeDungeons.filter(d => !d?.done).length;
 
-      // 🧮 CALCUL STRICT DES RANGS ET CATÉGORIES
+      const s = player?.stats || {};
+      const safeStats = { force: s.force || 5, agilite: s.agilite || 5, intelligence: s.intelligence || 5, volonte: s.volonte || 5, endurance: s.endurance || 5 };
+      const weakestStat = Object.keys(safeStats).reduce((a, b) => safeStats[a] < safeStats[b] ? a : b);
+
       const RANKS_ORDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
       const currentRankLetter = getRank(player?.level || 1).n;
       const rankIndex = Math.max(0, RANKS_ORDER.indexOf(currentRankLetter));
-      const minRank = Math.max(0, rankIndex - 1);
-      const maxRank = Math.min(RANKS_ORDER.length - 1, rankIndex + 1);
-      const allowedRanks = RANKS_ORDER.slice(minRank, maxRank + 1).join(', ');
+      const allowedRanks = RANKS_ORDER.slice(Math.max(0, rankIndex - 1), Math.min(RANKS_ORDER.length - 1, rankIndex + 1) + 1).join(', ');
 
-      const safeStats = { force, agilite, intelligence, volonte };
-      const weakestStat = Object.keys(safeStats).reduce((a, b) => safeStats[a] < safeStats[b] ? a : b);
+      const deviceLang = Intl.DateTimeFormat().resolvedOptions().locale || 'fr-FR';
+
+      // 🧠 LE CERVEAU DU SYSTÈME (Ajusté pour autoriser les épreuves multiples)
+      const systemPrompt = `You are the "System", a cold, analytical, and highly demanding life-optimization AI coach. Your absolute goal is the continuous, global evolution of the "Vessel" (the user). No fantasy roleplay.
+
+📊 VESSEL DATA:
+- Rank & Level: Rank ${currentRankLetter} (Level ${player?.level || 1}). Allowed ranks: [${allowedRanks}].
+- Body: ${age}yo | ${player?.weight || "X"}kg | ${player?.height || "X"}cm. Activity: ${player?.sedentary || "Unknown"}.
+- Mindset: Interests: [${player?.interests || "None"}]. Weaknesses: [${player?.weakness || "None"}].
+- Stats: STR ${safeStats.force}, AGI ${safeStats.agilite}, INT ${safeStats.intelligence}, WIL ${safeStats.volonte}, END ${safeStats.endurance}. Current Weakest: ${weakestStat.toUpperCase()}.
+- Recent tasks: ${recentQuests}
+- Active Long-Term Projects (Epreuves): ${activeDungeonsCount}
+
+⚠️ OPERATIONAL DIRECTIVES:
+1. PROGRESSIVE OVERLOAD: Tasks MUST scale with the Vessel's Rank.
+2. ADAPT TO REQUEST: The user provides a specific request. Generate EXACTLY 3 daily tasks that fit this request.
+3. TONE & DESCRIPTION: 'desc' field MUST be cold, analytical, and include a simulated real-world stat estimation.
+4. LONG-TERM PROJECT (ÉPREUVE): GENERATE 1 massive Project. It MUST draw heavily from the Vessel's Interests: [${player?.interests}]. It must be a concrete, long-term goal yielding 1500 XP. Do this even if active projects exist, to offer a new path of evolution.
+5. LANGUAGE: Output strictly in ${deviceLang}.
+
+You MUST reply ONLY with a JSON object. EXACT Format:
+{
+  "tasks": [
+    {"title": "Pompes strictes: 15 reps", "category": "Sport", "diff": "${currentRankLetter}", "desc": "Analyse musculaire en cours. Optimisation estimée: +0.2%."}
+  ],
+  "project": {
+    "title": "Coder un algorithme de tri complexe",
+    "desc": "Projet basé sur 'Tech'. Augmentation drastique de l'intelligence prévue.",
+    "xp": 1500
+  }
+}`;
+
+      const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
       
-      // 🎲 On récupère toutes tes catégories dispo (ex: "Sport, Cardio, Mental...")
-      const availableCategories = Object.keys(CAT).join(', ');
-
-      /// 🧠 NOUVEAU : Récupération du Mindset
-        const sedentary = player?.sedentary || "Non spécifié";
-        const weakness = player?.weakness || "Non spécifié";
-        const interests = player?.interests || "Non spécifié";
-        const chronotype = player?.chronotype || "Non spécifié";
-
-        const prompt = `Tu es un Coach de Vie et Entraîneur Sportif d'élite. Tu utilises un système de "Stats" et de "Rangs" pour gamifier l'expérience, mais tes conseils s'appliquent au MONDE RÉEL.
-Ta mission : Générer EXACTEMENT 3 quêtes quotidiennes pour une évolution humaine lente, saine, constante et disciplinée. AUCUN roleplay fantastique abstrait.
-
-📊 ANALYSE DU PROFIL :
-- Niveau actuel : ${player?.level || 1}.
-- Rang : ${currentRankLetter}. Rangs autorisés : [ ${allowedRanks} ].
-- Mensurations & Activité : ${age} ans, ${player?.weight || "X"} kg, ${player?.height || "X"} cm. Niveau d'activité pro : ${sedentary}.
-- Stats : Force ${force}, Agilité ${agilite}, Intelligence ${intelligence}, Volonté ${volonte}. Stat la plus faible : ${weakestStat.toUpperCase()}.
-- Rythme biologique : ${chronotype}.
-- Intérêts / Passions : ${interests}. (Sers-toi d'un ou plusieurs de ces éléments pour thématiser la quête 2).
-- Points faibles psychologiques : ${weakness}. (⚠️ Cible l'UN SEUL de ces points faibles ou la stat ${weakestStat} pour la quête 3).
-
-📜 HISTORIQUE :
-${recentQuests}
-
-⚠️ RÈGLES DE CRÉATION (OBLIGATOIRES) :
-- Les quêtes doivent être EXTRÊMEMENT CONCRÈTES, ACTIONNABLES et MESURABLES.
-- Utilise 3 catégories différentes parmi : [ ${availableCategories} ].
-- Quête 1 (Physique) : Un entraînement ou une action de santé physique claire (adaptée à sa sédentarité).
-- Quête 2 (Mental/Habitude) : Une action de productivité ou d'apprentissage, EN UTILISANT ses "Intérêts / Passions" pour le motiver.
-- Quête 3 (Focus) : Cible sa stat la plus faible (${weakestStat}) OU son "Point faible psychologique" (${weakness}) avec une action concrète à réaliser aujourd'hui.
-
-Dans le champ "desc", explique brièvement le bénéfice RÉEL de cette action sur sa vie.
-
-Réponds UNIQUEMENT avec un tableau JSON de 3 objets. N'écris AUCUN texte avant ou après. Format EXACT:
-[
-  {"title":"Titre clair","category":"Sport","diff":"${currentRankLetter}","desc":"Le bénéfice réel..."}
-]`;
-
-      const API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
-      
-      // 🛡️ L'Appel à Groq (Llama 3.1)
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      const res = await fetch(url, {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${API_KEY}`
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
-          max_tokens: 1500, // ⬅️ AJOUTE CETTE LIGNE POUR LUI DONNER LE TEMPS DE FINIR
-          temperature: 0.7,
-          messages: [{ role: "user", content: prompt }]
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents: [{
+            parts: [{ text: `Requête spécifique du réceptacle : "${goal || "Génère un protocole d'évolution standard."}"` }]
+          }],
+          generationConfig: {
+            temperature: 0.65,
+            responseMimeType: "application/json"
+          }
         })
       });
 
       const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
       
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
-      
-      // Extraction et nettoyage du texte
-      let textResponse = data.choices[0].message.content.trim();
+      let textResponse = data.candidates[0].content.parts[0].text.trim();
       textResponse = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
       
-      // 🛡️ LE PANSEMENT MAGIQUE : Si l'IA oublie le crochet de fin, on le rajoute !
-      if (!textResponse.endsWith(']')) {
-        // S'il y a une virgule qui traîne, on l'enlève pour éviter une erreur
-        if (textResponse.endsWith(',')) {
-          textResponse = textResponse.slice(0, -1);
-        }
-        textResponse += ']'; // On ferme le tableau de force !
-      }
-      
-      const firstBracket = textResponse.indexOf('[');
-      const lastBracket = textResponse.lastIndexOf(']');
-      
-      if (firstBracket !== -1 && lastBracket !== -1) {
-        textResponse = textResponse.substring(firstBracket, lastBracket + 1);
+      const firstBrace = textResponse.indexOf('{');
+      const lastBrace = textResponse.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        textResponse = textResponse.substring(firstBrace, lastBrace + 1);
       } else {
-        throw new Error("L'IA n'a pas renvoyé de tableau JSON.");
+        throw new Error("Erreur de formatage Système.");
       }
-      
-      const parsedQuests = JSON.parse(textResponse);
-      
-      if (!Array.isArray(parsedQuests)) throw new Error("Format invalide.");
 
-      setSuggs(parsedQuests);
-      setSel(new Set(parsedQuests.map((_, i) => i)));
+      const parsedData = JSON.parse(textResponse);
+
+      if (parsedData.tasks && Array.isArray(parsedData.tasks)) {
+        setSuggs(parsedData.tasks);
+        setSel(new Set(parsedData.tasks.map((_, i) => i)));
+      } else {
+        throw new Error("Format des tâches invalide.");
+      }
+
+      if (parsedData.project) {
+        setProjectSugg(parsedData.project);
+      }
       
     } catch (e) {
-      console.log("Erreur détaillée Groq:", e.message);
+      console.log("Erreur détaillée Gemini:", e.message);
       setSuggs([{ 
         title: "Erreur Système", 
         category: "Habitudes", 
         diff: "F", 
-        desc: `Impossible de générer. (${e.message})` 
+        desc: `Impossible de calculer l'évolution. (${e.message})` 
       }]);
     }
     setLoading(false);
   };
 
-  const toggle = i => {
+  const toggleTask = i => {
     const n = new Set(sel);
     n.has(i) ? n.delete(i) : n.add(i);
     setSel(n);
@@ -164,22 +146,33 @@ Réponds UNIQUEMENT avec un tableau JSON de 3 objets. N'écris AUCUN texte avant
 
   const confirm = () => {
     suggs.forEach((s, i) => { if (sel.has(i)) onAdd(s); });
+    if (projectSugg && projSel && onDungeonGenerated) {
+      onDungeonGenerated(projectSugg);
+    }
     onClose();
   };
+
+  const totalSelected = sel.size + (projectSugg && projSel ? 1 : 0);
 
   return (
     <Modal transparent animationType="slide" visible={true} onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.modal}>
-          <Text style={styles.title}>🤖 Éveil Quotidien (Système)</Text>
-          <Text style={styles.desc}>Le Système analyse ton réceptacle...</Text>
+          <Text style={styles.title}>🤖 Requête au Système</Text>
+          <Text style={styles.desc}>Ajustement du protocole selon vos directives.</Text>
           
           <View style={styles.inputRow}>
-            <TextInput style={styles.input} placeholder="Une envie ? (ex: Repos...)" placeholderTextColor={THEME.dim} value={goal} onChangeText={setGoal} />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Ex: Axé sur la lecture aujourd'hui..." 
+              placeholderTextColor={THEME.dim} 
+              value={goal} 
+              onChangeText={setGoal} 
+            />
           </View>
 
           <TouchableOpacity style={styles.btnFetchFull} onPress={generate} disabled={loading}>
-            <Text style={styles.btnFetchText}>{loading ? "Analyse en cours..." : "GÉNÉRER MES QUÊTES"}</Text>
+            <Text style={styles.btnFetchText}>{loading ? "Calcul en cours..." : "GÉNÉRER MON PROTOCOLE"}</Text>
           </TouchableOpacity>
 
           {loading && (
@@ -188,35 +181,59 @@ Réponds UNIQUEMENT avec un tableau JSON de 3 objets. N'écris AUCUN texte avant
             </View>
           )}
 
-          {!loading && suggs.length > 0 && (
-            <ScrollView style={styles.suggsList}>
-              {suggs.map((s, i) => {
-                const cat = CAT[s?.category] || { icon: "⚡", col: THEME.violet };
-                const isSel = sel.has(i);
-                return (
-                  <TouchableOpacity key={i} onPress={() => toggle(i)} style={[styles.suggCard, isSel && styles.suggCardActive]}>
+          {!loading && (suggs.length > 0 || projectSugg) && (
+            <ScrollView style={styles.suggsList} showsVerticalScrollIndicator={false}>
+              
+              {/* AFFICHAGE DU PROJET SI GÉNÉRÉ */}
+              {projectSugg && (
+                <View style={styles.projectSection}>
+                  <Text style={styles.sectionTitle}>NOUVELLE ÉPREUVE (LONG TERME)</Text>
+                  <TouchableOpacity onPress={() => setProjSel(!projSel)} style={[styles.suggCard, projSel && styles.projectCardActive]}>
                     <View style={styles.suggHeader}>
-                      <Text style={styles.suggTitle}>{cat.icon} {s?.title || "Quête Inconnue"}</Text>
-                      {isSel && <Text style={{ color: THEME.cyan, fontWeight: 'bold' }}>✓</Text>}
+                      <Text style={styles.suggTitle}>🏰 {projectSugg.title}</Text>
+                      {projSel && <Text style={{ color: THEME.gold, fontWeight: 'bold' }}>✓</Text>}
                     </View>
-                    <Text style={styles.suggDesc}>{s?.desc}</Text>
+                    <Text style={styles.suggDesc}>{projectSugg.desc}</Text>
                     <View style={styles.suggFooter}>
-                      <Text style={styles.suggXp}>+{DXP[s?.diff] || 60} XP</Text>
-                      <View style={styles.suggBadge}><Text style={styles.suggBadgeText}>Rang {s?.diff || "E"}</Text></View>
+                      <Text style={[styles.suggXp, { color: THEME.gold }]}>+{projectSugg.xp || 1500} XP</Text>
                     </View>
                   </TouchableOpacity>
-                );
-              })}
+                </View>
+              )}
+
+              {/* AFFICHAGE DES TÂCHES */}
+              {suggs.length > 0 && (
+                <View>
+                  <Text style={styles.sectionTitle}>TÂCHES QUOTIDIENNES</Text>
+                  {suggs.map((s, i) => {
+                    const cat = CAT[s?.category] || { icon: "⚡", col: THEME.violet };
+                    const isSel = sel.has(i);
+                    return (
+                      <TouchableOpacity key={i} onPress={() => toggleTask(i)} style={[styles.suggCard, isSel && styles.suggCardActive]}>
+                        <View style={styles.suggHeader}>
+                          <Text style={styles.suggTitle}>{cat.icon} {s?.title || "Quête Inconnue"}</Text>
+                          {isSel && <Text style={{ color: THEME.cyan, fontWeight: 'bold' }}>✓</Text>}
+                        </View>
+                        <Text style={styles.suggDesc}>{s?.desc}</Text>
+                        <View style={styles.suggFooter}>
+                          <Text style={styles.suggXp}>+{DXP[s?.diff] || 60} XP</Text>
+                          <View style={styles.suggBadge}><Text style={styles.suggBadgeText}>Rang {s?.diff || "E"}</Text></View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </ScrollView>
           )}
 
           <View style={styles.btnRow}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>{suggs.length > 0 ? "Ignorer" : "Fermer"}</Text>
+              <Text style={styles.cancelText}>{(suggs.length > 0 || projectSugg) ? "Ignorer" : "Fermer"}</Text>
             </TouchableOpacity>
-            {sel.size > 0 && (
+            {totalSelected > 0 && (
               <TouchableOpacity style={styles.submitBtn} onPress={confirm}>
-                <Text style={styles.submitText}>Accepter ({sel.size})</Text>
+                <Text style={styles.submitText}>Accepter ({totalSelected})</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -236,9 +253,14 @@ const styles = StyleSheet.create({
   btnFetchFull: { backgroundColor: 'rgba(6,182,212,.15)', borderWidth: 1, borderColor: THEME.cyan, borderRadius: 8, padding: 14, alignItems: 'center', marginBottom: 15 },
   btnFetchText: { color: THEME.cyan, fontWeight: 'bold', letterSpacing: 1 },
   loadingBox: { alignItems: 'center', paddingVertical: 40 },
-  suggsList: { maxHeight: 350, marginBottom: 10 },
+  
+  suggsList: { maxHeight: 400, marginBottom: 10 },
+  sectionTitle: { color: THEME.dim, fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 8, marginTop: 4 },
+  
   suggCard: { backgroundColor: 'rgba(255,255,255,.02)', borderWidth: 1, borderColor: 'rgba(255,255,255,.05)', borderRadius: 10, padding: 12, marginBottom: 8 },
   suggCardActive: { backgroundColor: 'rgba(6,182,212,.1)', borderColor: THEME.cyan },
+  projectCardActive: { backgroundColor: 'rgba(251,191,36,.1)', borderColor: THEME.gold },
+  
   suggHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, alignItems: 'center' },
   suggTitle: { color: THEME.text, fontWeight: 'bold', fontSize: 14 },
   suggDesc: { color: THEME.dim, fontSize: 12, marginBottom: 8, lineHeight: 18 },
@@ -246,6 +268,7 @@ const styles = StyleSheet.create({
   suggXp: { color: THEME.vlight, fontSize: 12, fontWeight: 'bold' },
   suggBadge: { backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   suggBadgeText: { color: THEME.text, fontSize: 10, fontWeight: 'bold' },
+  
   btnRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
   cancelBtn: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center', backgroundColor: 'rgba(255,255,255,.05)' },
   submitBtn: { flex: 2, padding: 14, borderRadius: 8, alignItems: 'center', backgroundColor: THEME.cyan },

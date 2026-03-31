@@ -6,24 +6,26 @@ import { THEME } from '../constants/theme';
 import { CAT } from '../constants/gameData';
 import { getRank } from '../utils/helpers';
 
-export const AutoSystem = ({ player, quests, onQuestGenerated }) => {
+export const AutoSystem = ({ player, quests, dungeons, onQuestGenerated, onDungeonGenerated }) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     const checkDaily = async () => {
       try {
-        // 1. On vérifie la date du jour
         const today = new Date().toDateString();
         const lastDate = await AsyncStorage.getItem('last_auto_quest_date');
 
-        // Si les quêtes ont déjà été générées aujourd'hui, le composant reste invisible et ne fait rien !
         if (lastDate === today) return;
 
-        // 2. C'est un nouveau jour ! On bloque l'écran pour montrer que le Système travaille
         setIsGenerating(true);
 
         const safeQuests = Array.isArray(quests) ? quests : [];
-        const recentQuests = safeQuests.filter(q => q?.done).slice(-10).map(q => q?.title).join(", ") || "Aucune";
+        const recentQuests = safeQuests.filter(q => q?.done).slice(-15).map(q => q?.title).join(", ") || "Aucune donnée récente";
+
+        // Vérification des Projets en cours
+        const safeDungeons = Array.isArray(dungeons) ? dungeons : [];
+        const activeDungeonsCount = safeDungeons.filter(d => !d?.done).length;
+        const needsNewProject = activeDungeonsCount === 0;
 
         let age = "Inconnu";
         if (player?.dob) {
@@ -35,124 +37,111 @@ export const AutoSystem = ({ player, quests, onQuestGenerated }) => {
         }
 
         const s = player?.stats || {};
-        const force = s.force || 5;
-        const agilite = s.agilite || 5;
-        const intelligence = s.intelligence || 5;
-        const volonte = s.volonte || 5;
-
-        const safeStats = { force, agilite, intelligence, volonte };
+        const safeStats = { force: s.force || 5, agilite: s.agilite || 5, intelligence: s.intelligence || 5, volonte: s.volonte || 5, endurance: s.endurance || 5 };
         const weakestStat = Object.keys(safeStats).reduce((a, b) => safeStats[a] < safeStats[b] ? a : b);
 
-        const RANKS_ORDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
         const currentRankLetter = getRank(player?.level || 1).n;
-        const rankIndex = Math.max(0, RANKS_ORDER.indexOf(currentRankLetter));
-        const minRank = Math.max(0, rankIndex - 1);
-        const maxRank = Math.min(RANKS_ORDER.length - 1, rankIndex + 1);
-        const allowedRanks = RANKS_ORDER.slice(minRank, maxRank + 1).join(', ');
-
         const availableCategories = Object.keys(CAT).join(', ');
+        const deviceLang = Intl.DateTimeFormat().resolvedOptions().locale || 'fr-FR';
 
-        // 🧠 NOUVEAU : Récupération du Mindset
-        const sedentary = player?.sedentary || "Non spécifié";
-        const weakness = player?.weakness || "Non spécifié";
-        const interests = player?.interests || "Non spécifié";
-        const chronotype = player?.chronotype || "Non spécifié";
+        // 🧠 LE CERVEAU DU SYSTÈME - PROMPT OPTIMISÉ
+        const systemPrompt = `You are the "System", a cold, analytical, and highly demanding life-optimization AI coach. Your absolute goal is the continuous, global evolution of the "Vessel" (the user) towards perfection. No fantasy roleplay.
 
-        const prompt = `Tu es un Coach de Vie et Entraîneur Sportif d'élite. Tu utilises un système de "Stats" et de "Rangs" pour gamifier l'expérience, mais tes conseils s'appliquent au MONDE RÉEL.
-Ta mission : Générer EXACTEMENT 3 quêtes quotidiennes pour une évolution humaine lente, saine, constante et disciplinée. AUCUN roleplay fantastique abstrait.
+📊 VESSEL DATA (Analyze carefully for scaling):
+- Rank & Level: Rank ${currentRankLetter} (Level ${player?.level || 1}).
+- Body Profile: ${age}yo | ${player?.weight || "X"}kg | ${player?.height || "X"}cm.
+- Lifestyle: ${player?.sedentary || "Unknown"}.
+- Mindset: Interests: [${player?.interests || "None"}]. Weaknesses: [${player?.weakness || "None"}].
+- Stats: STR ${safeStats.force}, AGI ${safeStats.agilite}, INT ${safeStats.intelligence}, WIL ${safeStats.volonte}, END ${safeStats.endurance}. Current Weakest: ${weakestStat.toUpperCase()}.
+- Recent tasks (Avoid exact repetition, vary the methods): ${recentQuests}
 
-📊 ANALYSE DU PROFIL :
-- Niveau actuel : ${player?.level || 1}.
-- Rang : ${currentRankLetter}. Rangs autorisés : [ ${allowedRanks} ].
-- Mensurations & Activité : ${age} ans, ${player?.weight || "X"} kg, ${player?.height || "X"} cm. Niveau d'activité pro : ${sedentary}.
-- Stats : Force ${force}, Agilité ${agilite}, Intelligence ${intelligence}, Volonté ${volonte}. Stat la plus faible : ${weakestStat.toUpperCase()}.
-- Rythme biologique : ${chronotype}.
-- Intérêts / Passions : ${interests}. (Sers-toi d'un ou plusieurs de ces éléments pour thématiser la quête 2).
-- Points faibles psychologiques : ${weakness}. (⚠️ Cible l'UN SEUL de ces points faibles ou la stat ${weakestStat} pour la quête 3).
+⚠️ OPERATIONAL DIRECTIVES:
+1. PROGRESSIVE OVERLOAD (Crescendo): Tasks MUST scale with the Vessel's Rank. A Rank E gets accessible but challenging tasks. A Rank S gets extreme tasks. Take age/weight into account to avoid injury, but push them past their limits.
+2. GLOBAL IMPROVEMENT: Do not just focus on the weakness. Ensure a mix of physical, mental, and intellectual growth over time.
+3. TONE & DESCRIPTION: The 'desc' field MUST be written in a cold, analytical, or strict coach tone. It MUST include a simulated real-world stat estimation (e.g., "Augmentation estimée de la capacité pulmonaire: +0.4%").
+4. LONG-TERM PROJECT: ${needsNewProject ? `GENERATE 1 massive Project. It MUST draw heavily from the Vessel's Interests: [${player?.interests}]. It must be a concrete, long-term goal (weeks/months) yielding 1500 XP.` : `DO NOT GENERATE A PROJECT. Active project exists.`}
+5. LANGUAGE: Output strictly in ${deviceLang}.
 
-📜 HISTORIQUE :
-${recentQuests}
+You MUST reply ONLY with a JSON object. EXACT Format:
+{
+  "tasks": [
+    {"title": "Pompes strictes: 15 reps", "category": "Sport", "diff": "${currentRankLetter}", "desc": "Analyse musculaire en cours. Optimisation de la force estimée à +0.2%. Exécution requise."}
+  ]${needsNewProject ? `,
+  "project": {
+    "title": "Coder un algorithme de tri complexe",
+    "desc": "Projet à long terme basé sur l'intérêt 'Tech/Code'. Augmentation drastique de l'intelligence prévue.",
+    "xp": 1500
+  }` : ''}
+}`;
 
-⚠️ RÈGLES DE CRÉATION (OBLIGATOIRES) :
-- Les quêtes doivent être EXTRÊMEMENT CONCRÈTES, ACTIONNABLES et MESURABLES.
-- Utilise 3 catégories différentes parmi : [ ${availableCategories} ].
-- Quête 1 (Physique) : Un entraînement ou une action de santé physique claire (adaptée à sa sédentarité).
-- Quête 2 (Mental/Habitude) : Une action de productivité ou d'apprentissage, EN UTILISANT ses "Intérêts / Passions" pour le motiver.
-- Quête 3 (Focus) : Cible sa stat la plus faible (${weakestStat}) OU son "Point faible psychologique" (${weakness}) avec une action concrète à réaliser aujourd'hui.
-
-Dans le champ "desc", explique brièvement le bénéfice RÉEL de cette action sur sa vie.
-
-Réponds UNIQUEMENT avec un tableau JSON de 3 objets. N'écris AUCUN texte avant ou après. Format EXACT:
-[
-  {"title":"Titre clair","category":"Sport","diff":"${currentRankLetter}","desc":"Le bénéfice réel..."}
-]`;
-
-        const API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY; 
+        const API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY; 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`;
         
-        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        const res = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
-          body: JSON.stringify({ model: "llama-3.1-8b-instant", max_tokens: 1500, temperature: 0.7, messages: [{ role: "user", content: prompt }] })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ parts: [{ text: "Système, génère mon protocole d'évolution quotidien." }] }],
+            generationConfig: { temperature: 0.65, responseMimeType: "application/json" } // Température légèrement baissée pour plus de précision et de rationalité
+          })
         });
 
         const data = await res.json();
         if (data.error) throw new Error(data.error.message);
         
-        let textResponse = data.choices[0].message.content.trim();
+        let textResponse = data.candidates[0].content.parts[0].text.trim();
         textResponse = textResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
         
-        if (!textResponse.endsWith(']')) {
-          if (textResponse.endsWith(',')) textResponse = textResponse.slice(0, -1);
-          textResponse += ']'; 
+        const firstBrace = textResponse.indexOf('{');
+        const lastBrace = textResponse.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1) {
+          textResponse = textResponse.substring(firstBrace, lastBrace + 1);
+        } else {
+          throw new Error("Erreur de formatage Système.");
         }
-        
-        const firstBracket = textResponse.indexOf('[');
-        const lastBracket = textResponse.lastIndexOf(']');
-        if (firstBracket !== -1 && lastBracket !== -1) {
-          textResponse = textResponse.substring(firstBracket, lastBracket + 1);
-        } else throw new Error("Format JSON invalide.");
-        
-        const parsedQuests = JSON.parse(textResponse);
 
-        // 3. Magie d'intégration automatique : On ajoute les quêtes une par une avec un mini-délai
-        if (Array.isArray(parsedQuests)) {
-          parsedQuests.forEach((q, index) => {
+        const parsedData = JSON.parse(textResponse);
+
+        // Déploiement des tâches
+        if (parsedData.tasks && Array.isArray(parsedData.tasks)) {
+          parsedData.tasks.forEach((q, index) => {
             setTimeout(() => onQuestGenerated(q), index * 100); 
           });
-          // On sauvegarde la date pour ne plus l'embêter aujourd'hui
-          await AsyncStorage.setItem('last_auto_quest_date', today);
         }
 
-        // 4. On referme l'écran de chargement tout seul après 1 seconde
-        setTimeout(() => setIsGenerating(false), 1000);
+        // Déploiement du Projet
+        if (parsedData.project && onDungeonGenerated) {
+          setTimeout(() => onDungeonGenerated(parsedData.project), 500);
+        }
+
+        await AsyncStorage.setItem('last_auto_quest_date', today);
+        setTimeout(() => setIsGenerating(false), 1500);
 
       } catch (e) {
         console.log("Erreur AutoSystem:", e.message);
-        setIsGenerating(false); // En cas de problème de connexion, on libère l'écran
+        setIsGenerating(false);
       }
     };
 
-    // Laisse l'application charger pendant 1.5 seconde, puis déclenche l'analyse
     const timer = setTimeout(checkDaily, 1500);
     return () => clearTimeout(timer);
   }, []);
 
-  // Si l'IA n'est pas en train de générer les quêtes quotidiennes, ce composant est INVISIBLE.
   if (!isGenerating) return null;
 
-  // Si l'IA travaille, on affiche cette interface menaçante façon "Système" sur tout l'écran :
   return (
     <View style={styles.overlay}>
       <Text style={styles.title}>⚠️ AVIS DU SYSTÈME</Text>
       <ActivityIndicator size="large" color={THEME.cyan} style={{ marginVertical: 35, transform: [{ scale: 1.5 }] }} />
-      <Text style={styles.desc}>Génération de vos objectifs quotidiens...</Text>
-      <Text style={styles.subdesc}>Analyse de votre réceptacle en cours</Text>
+      <Text style={styles.desc}>Calcul du protocole d'évolution...</Text>
+      <Text style={styles.subdesc}>Analyse des statistiques et intérêts du réceptacle</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(10, 10, 20, 0.96)', zIndex: 9999, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(5, 5, 15, 0.98)', zIndex: 9999, justifyContent: 'center', alignItems: 'center', padding: 20 },
   title: { color: THEME.cyan, fontSize: 24, fontWeight: 'bold', letterSpacing: 2, textAlign: 'center' },
   desc: { color: THEME.text, fontSize: 16, textAlign: 'center', fontWeight: 'bold' },
   subdesc: { color: THEME.dim, fontSize: 13, textAlign: 'center', marginTop: 12, fontStyle: 'italic' }

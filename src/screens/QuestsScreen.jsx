@@ -75,7 +75,6 @@ export const QuestsScreen = ({ quests, player, onComplete, onUndo, onDelete, onA
       </ScrollView>
 
       <View style={styles.fabContainer}>
-        <TouchableOpacity style={styles.fabSecondary} onPress={onAI}><Text style={styles.fabText}>🤖</Text></TouchableOpacity>
         <TouchableOpacity style={styles.fabPrimary} onPress={onAdd}><Text style={styles.fabText}>+</Text></TouchableOpacity>
       </View>
 
