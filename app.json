@@ -39,12 +39,22 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "SystemWidget",
+              "label": "Kensho Système",
+              "minWidth": "250dp",
+              "minHeight": "150dp",
+              "description": "Statut du Réceptacle et Quêtes",
+              "previewImage": "./assets/images/icon.png"
+            }
+          ]
         }
       ]
     ],

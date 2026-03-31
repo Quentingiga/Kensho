@@ -3,6 +3,10 @@ import { View, StyleSheet, StatusBar, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 
+// --- IMPORT WIDGET ---
+import { requestWidgetUpdate, registerWidgetTaskHandler } from 'react-native-android-widget';
+import { widgetTaskHandler } from './src/widget/widgetTask';
+
 // --- IMPORTS DE NOTRE ARCHITECTURE ---
 import { THEME } from './src/constants/theme';
 import { DEF_PLAYER, INIT_QUESTS, INIT_DUNGEONS, DXP, CAT } from './src/constants/gameData';
@@ -30,6 +34,8 @@ import { AIModal } from './src/modals/AIModal';
 import { LevelUpOverlay } from './src/modals/LevelUpOverlay';
 
 import { registerSystemNotifications, schedulePenaltyWarning, cancelSystemWarning } from './src/utils/notifications';
+
+registerWidgetTaskHandler(widgetTaskHandler);
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -173,6 +179,11 @@ export default function App() {
     stSave("sl_p", player);
     stSave("sl_q", quests);
     stSave("sl_d", dungeons);
+
+    requestWidgetUpdate({
+      widgetName: 'SystemWidget',
+      renderWidget: () => widgetTaskHandler({ widgetAction: 'UPDATE' }),
+    });
 
     const timer = setTimeout(async () => {
       try {
