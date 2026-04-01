@@ -1,72 +1,9 @@
 // src/components/PenaltySystem.jsx
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { THEME } from '../constants/theme';
-import { CAT, DXP } from '../constants/gameData';
 
-export const PenaltySystem = ({ quests, onApplyPenalty }) => {
-  const [penaltyData, setPenaltyData] = useState(null);
-
-  useEffect(() => {
-    const checkPenalty = async () => {
-      try {
-        const today = new Date().toDateString();
-        const lastDate = await AsyncStorage.getItem('last_login_date');
-
-        // Si c'est la toute première fois qu'on ouvre l'app, on initialise juste la date
-        if (!lastDate) {
-          await AsyncStorage.setItem('last_login_date', today);
-          return;
-        }
-
-        // C'est un nouveau jour : on fait l'inventaire des échecs de la veille
-        if (lastDate !== today) {
-          const unfinished = quests.filter(q => !q.done);
-
-          if (unfinished.length > 0) {
-            let totalXp = 0;
-            let statsLost = { force: 0, agilite: 0, intelligence: 0, volonte: 0 };
-
-            unfinished.forEach(q => {
-              // 1/5ème de l'XP prévue
-              const xp = DXP[q.diff] || 60;
-              totalXp += Math.floor(xp / 5); 
-              
-              // 1/5ème (0.2) du point de stat prévu
-              const cat = CAT[q.category];
-              if (cat && cat.stat) {
-                statsLost[cat.stat] += 0.2;
-              }
-            });
-
-            // On prépare le rapport de pénalité et on ouvre la modale
-            setPenaltyData({ 
-              xp: totalXp, 
-              stats: statsLost, 
-              ids: unfinished.map(q => q.id), 
-              count: unfinished.length 
-            });
-          }
-
-          // On met à jour la date d'aujourd'hui pour ne punir qu'une fois
-          await AsyncStorage.setItem('last_login_date', today);
-        }
-      } catch (e) {
-        console.log("Erreur PenaltySystem:", e);
-      }
-    };
-
-    // On laisse le temps à l'application de charger avant de lancer le jugement (2 secondes)
-    const timer = setTimeout(checkPenalty, 2000);
-    return () => clearTimeout(timer);
-  }, [quests]);
-
-  const handleAcceptPenalty = () => {
-    onApplyPenalty(penaltyData);
-    setPenaltyData(null);
-  };
-
+export const PenaltySystem = ({ penaltyData, onApplyPenalty }) => {
   if (!penaltyData) return null;
 
   return (
@@ -87,7 +24,7 @@ export const PenaltySystem = ({ quests, onApplyPenalty }) => {
             <Text style={[styles.penaltyText, { color: THEME.gold, marginTop: 4 }]}>🔥 Streak réinitialisé (0)</Text>
           </View>
 
-          <TouchableOpacity style={styles.btn} onPress={handleAcceptPenalty}>
+          <TouchableOpacity style={styles.btn} onPress={() => onApplyPenalty(penaltyData)}>
             <Text style={styles.btnText}>Accepter la sentence</Text>
           </TouchableOpacity>
         </View>

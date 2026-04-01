@@ -51,6 +51,7 @@ export default function App() {
   const [showAI, setShowAI] = useState(false);
   const [showAD, setShowAD] = useState(false);
   const [lvlUp, setLvlUp] = useState(null);
+  const [penaltyData, setPenaltyData] = useState(null);
 
   const pagerRef = useRef(null);
   const TABS_ORDER = ["dashboard", "quests", "dungeons", "profile"];
@@ -151,20 +152,41 @@ export default function App() {
         }
 
         // Reset quotidien des quêtes
+        // Reset quotidien des quêtes
         const td = todayStr();
         let fq = q;
-        if (p.lastDate !== td) {
+        let newPenalty = null;
+
+        if (p.lastDate && p.lastDate !== td) {
+          // 1. CALCUL DE LA PÉNALITÉ (avant de remettre les quêtes à zéro)
+          const unfinished = q.filter(x => !x.done);
+          if (unfinished.length > 0) {
+            let totalXp = 0;
+            let statsLost = { force: 0, agilite: 0, intelligence: 0, volonte: 0, endurance: 0 };
+            unfinished.forEach(uq => {
+              const xp = DXP[uq.diff] || 60;
+              totalXp += Math.floor(xp / 5);
+              const cat = CAT[uq.category];
+              if (cat && cat.stat) statsLost[cat.stat] = (statsLost[cat.stat] || 0) + 0.2;
+            });
+            newPenalty = { xp: totalXp, stats: statsLost, count: unfinished.length };
+          }
+
+          // 2. RÉINITIALISATION DES QUÊTES
           fq = q.map(x => ({ ...x, done: false }));
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const wasYesterday = p.lastDate === yesterday.toDateString();
-          p.streak = wasYesterday ? (p.streak || 0) + 1 : (p.lastDate ? 0 : p.streak || 0);
+          p.streak = wasYesterday ? (p.streak || 0) + 1 : 0;
           p.lastDate = td;
+        } else if (!p.lastDate) {
+          p.lastDate = td; // Initialisation première ouverture
         }
         
         setPlayer(p); 
         setQuests(Array.isArray(fq) ? fq : INIT_QUESTS); 
         setDungeons(Array.isArray(d) ? d : INIT_DUNGEONS); 
+        if (newPenalty) setPenaltyData(newPenalty); // 🔴 Affiche la modale si nécessaire
         setReady(true);
       } catch (e) {
         console.log("Erreur chargement:", e);
@@ -284,21 +306,23 @@ export default function App() {
     });
   }, []);
 
-  const applyPenalty = useCallback((penaltyData) => {
-    setQuests(prev => prev.filter(q => !penaltyData.ids.includes(q.id)));
+  const applyPenalty = useCallback((penData) => {
     setPlayer(p => {
-      let newXp = p.xp - penaltyData.xp;
+      let newXp = p.xp - penData.xp;
       let newLevel = p.level;
       while (newXp < 0 && newLevel > 1) { newLevel--; newXp += xpNeed(newLevel); }
       if (newXp < 0 && newLevel === 1) newXp = 0;
 
       let newStats = { ...p.stats };
-      Object.keys(penaltyData.stats).forEach(k => {
-        newStats[k] = Math.max(0, Number((newStats[k] - penaltyData.stats[k]).toFixed(1)));
+      Object.keys(penData.stats).forEach(k => {
+        if (penData.stats[k] > 0) {
+          newStats[k] = Math.max(0, Number((newStats[k] - penData.stats[k]).toFixed(1)));
+        }
       });
 
       return { ...p, xp: newXp, level: newLevel, stats: newStats, streak: 0 };
     });
+    setPenaltyData(null); // 🔴 Ferme la modale
   }, []);
 
   const completeQuest = useCallback(id => {
@@ -384,7 +408,7 @@ export default function App() {
         onDungeonGenerated={addDungeon} 
       />
 
-      <PenaltySystem quests={quests} onApplyPenalty={applyPenalty} />
+      <PenaltySystem penaltyData={penaltyData} onApplyPenalty={applyPenalty} />
 
       {showAQ && <AddQuestModal onAdd={addQuest} onClose={() => setShowAQ(false)} />}
       {showAI && <AIModal player={player} quests={quests} dungeons={dungeons} onAdd={addQuest} onDungeonGenerated={addDungeon} onClose={() => setShowAI(false)} />}
