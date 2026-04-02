@@ -3,14 +3,12 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SystemWidget } from './SystemWidget';
 
-// On recrée rapidement le mapping des icônes pour le widget
 const CAT_ICONS = {
   "Sport": "⚔", "Cardio": "⚡", "Mental": "🧘", "Étude": "📚", "Habitudes": "🎯"
 };
 
-export async function widgetTaskHandler({ widgetAction }) {
+export async function widgetTaskHandler(props) {
   try {
-    // Le widget lit les mêmes données que l'application principale
     const pStr = await AsyncStorage.getItem('sl_p');
     const qStr = await AsyncStorage.getItem('sl_q');
 
@@ -20,21 +18,20 @@ export async function widgetTaskHandler({ widgetAction }) {
     if (pStr) player = JSON.parse(pStr);
     if (qStr) quests = JSON.parse(qStr);
 
-    // On ne garde que les quêtes non terminées (pour mettre la pression au Chasseur)
     const activeQuests = quests.filter(q => !q.done);
-    
     const mappedTasks = activeQuests.map(q => ({
       title: q.title,
       diff: q.diff,
       icon: CAT_ICONS[q.category] || "🎯"
     }));
 
-    return {
-      props: { player, tasks: mappedTasks },
-      widget: SystemWidget,
-    };
+    console.log("🛠️ [WIDGET] Injection du rendu dans Android...");
+    
+    // ⚠️ LA CORRECTION EST LÀ : On n'utilise pas "return", on appelle la fonction d'Android
+    props.renderWidget(<SystemWidget player={player} tasks={mappedTasks} />);
+    
   } catch (e) {
-    console.error("Erreur du Widget:", e);
-    return { props: { player: {level: 1, xp: 0}, tasks: [] }, widget: SystemWidget };
+    console.error("❌ Erreur du Widget:", e);
+    props.renderWidget(<SystemWidget player={{level: 1, xp: 0}} tasks={[]} />);
   }
 }
