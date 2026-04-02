@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Text } from 'react-native';
+import { View, StyleSheet, StatusBar, Text, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 
 // --- IMPORT WIDGET ---
 import { requestWidgetUpdate, registerWidgetTaskHandler } from 'react-native-android-widget';
 import { widgetTaskHandler } from './src/widget/widgetTask';
+import { SystemWidget } from './src/widget/SystemWidget';
 
 // --- IMPORTS DE NOTRE ARCHITECTURE ---
 import { THEME } from './src/constants/theme';
@@ -34,8 +35,6 @@ import { AIModal } from './src/modals/AIModal';
 import { LevelUpOverlay } from './src/modals/LevelUpOverlay';
 
 import { registerSystemNotifications, schedulePenaltyWarning, cancelSystemWarning } from './src/utils/notifications';
-
-registerWidgetTaskHandler(widgetTaskHandler);
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -172,12 +171,19 @@ export default function App() {
             newPenalty = { xp: totalXp, stats: statsLost, count: unfinished.length };
           }
 
-          // 2. RÉINITIALISATION DES QUÊTES
+          // 2. RÉINITIALISATION DES QUÊTES ET DU STREAK
           fq = q.map(x => ({ ...x, done: false }));
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const wasYesterday = p.lastDate === yesterday.toDateString();
-          p.streak = wasYesterday ? (p.streak || 0) + 1 : 0;
+          
+          // 🛡️ CORRECTION : Le streak augmente SEULEMENT si connecté hier ET aucune quête inachevée
+          if (wasYesterday && unfinished.length === 0) {
+            p.streak = (p.streak || 0) + 1;
+          } else {
+            p.streak = 0;
+          }
+          
           p.lastDate = td;
         } else if (!p.lastDate) {
           p.lastDate = td; // Initialisation première ouverture
@@ -202,9 +208,20 @@ export default function App() {
     stSave("sl_q", quests);
     stSave("sl_d", dungeons);
 
+    // 📱 MISE À JOUR DU WIDGET
+    const activeQuests = quests.filter(q => !q.done);
+    const mappedTasks = activeQuests.map(q => ({
+      title: q.title,
+      diff: q.diff,
+      icon: CAT[q.category]?.icon || "🎯"
+    }));
+
+    console.log("🛠️ [WIDGET] Demande de mise à jour manuelle...");
+
     requestWidgetUpdate({
       widgetName: 'SystemWidget',
-      renderWidget: () => widgetTaskHandler({ widgetAction: 'UPDATE' }),
+      // ⚠️ LA CORRECTION EST LÀ : Pas de () => devant le <SystemWidget />
+      renderWidget: <SystemWidget player={player} tasks={mappedTasks} />,
     });
 
     const timer = setTimeout(async () => {
@@ -277,6 +294,31 @@ export default function App() {
       schedulePenaltyWarning();
     }
   }, [quests, ready]);
+
+  // --- FORCER LA MAJ DU WIDGET AU LANCEMENT / RETOUR AU PREMIER PLAN ---
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && ready) {
+        console.log("🛠️ [WIDGET] App ouverte, mise à jour forcée du Système !");
+        
+        const activeQuests = quests.filter(q => !q.done);
+        const mappedTasks = activeQuests.map(q => ({
+          title: q.title,
+          diff: q.diff,
+          icon: CAT[q.category]?.icon || "🎯"
+        }));
+
+        requestWidgetUpdate({
+          widgetName: 'SystemWidget',
+          renderWidget: <SystemWidget player={player} tasks={mappedTasks} />,
+        });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [ready, player, quests]);
 
   // --- 3. MÉCANIQUES DE JEU ---
   const gainXP = useCallback((xp, bonus) => {
