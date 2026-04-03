@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { DungeonCard } from '../components/DungeonCard';
 import { THEME } from '../constants/theme';
 
-export const DungeonsScreen = ({ dungeons, onUpdate, onAdd }) => {
+export const DungeonsScreen = ({ dungeons, onUpdate, onDelete, onAdd }) => {
   const activeCount = dungeons.filter(d => !d.done).length;
 
   return (
@@ -22,7 +22,16 @@ export const DungeonsScreen = ({ dungeons, onUpdate, onAdd }) => {
           </View>
         )}
 
-        {dungeons.map(d => <DungeonCard key={d.id} d={d} onUpdate={onUpdate} />)}
+        {/* 🛡️ C'EST ICI LE PLUS IMPORTANT : on passe onUpdate et onDelete à chaque carte */}
+        {dungeons.map(d => (
+          <DungeonCard 
+            key={d.id} 
+            d={d} 
+            onUpdate={onUpdate} 
+            onDelete={onDelete} 
+          />
+        ))}
+        
       </ScrollView>
 
       <View style={styles.fabContainer}>

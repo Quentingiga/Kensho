@@ -78,7 +78,7 @@ export const QuestsScreen = ({ quests, player, onComplete, onUndo, onDelete, onA
         <TouchableOpacity style={styles.fabPrimary} onPress={onAdd}><Text style={styles.fabText}>+</Text></TouchableOpacity>
       </View>
 
-      {/* 🔴 NOTRE NOUVELLE MODALE DE SUPPRESSION SYSTÈME */}
+      {/* 🔴 MODALE DE SUPPRESSION SYSTÈME */}
       {questToDelete && (
         <Modal transparent animationType="fade" visible={true} onRequestClose={() => setQuestToDelete(null)}>
           <View style={styles.modalOverlay}>

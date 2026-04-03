@@ -1,11 +1,11 @@
 // src/screens/ProfileScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { RankBadge } from '../components/RankBadge';
 import { THEME } from '../constants/theme';
 import { STATS, CAT, DXP } from '../constants/gameData';
 import { getRank } from '../utils/helpers';
-import { supabase } from '../utils/supabase'; // ☁️ NOUVEAU : Pour gérer la déconnexion
+import { supabase } from '../utils/supabase'; 
 
 const PRESETS = {
   sedentary: ["Sédentaire", "Étudiant", "Actif", "Travail physique"],
@@ -75,7 +75,6 @@ const MultiSelectionBox = ({ value, onChange, options }) => {
 export const ProfileScreen = ({ player, quests, onUpdateProfile }) => {
   const r = getRank(player.level);
   
-  // ⚙️ NOUVEAU : État pour le menu des réglages
   const [showSettings, setShowSettings] = useState(false);
 
   const [editName, setEditName] = useState(false);
@@ -98,7 +97,6 @@ export const ProfileScreen = ({ player, quests, onUpdateProfile }) => {
 
   const [expandedStat, setExpandedStat] = useState(null);
 
-  // 🚪 NOUVEAU : Fonction de déconnexion
   const handleLogout = () => {
     Alert.alert(
       "Déconnexion du Système",
@@ -160,7 +158,6 @@ export const ProfileScreen = ({ player, quests, onUpdateProfile }) => {
 
   return (
     <View style={styles.container}>
-      {/* ⚙️ MENU DES PARAMÈTRES (MODALE) */}
       <Modal transparent visible={showSettings} animationType="fade" onRequestClose={() => setShowSettings(false)}>
         <TouchableOpacity style={styles.settingsOverlay} activeOpacity={1} onPress={() => setShowSettings(false)}>
           <View style={styles.settingsMenu}>
@@ -175,187 +172,184 @@ export const ProfileScreen = ({ player, quests, onUpdateProfile }) => {
         </TouchableOpacity>
       </Modal>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* ⚙️ EN-TÊTE AVEC BOUTON DE RÉGLAGES */}
-        <View style={styles.headerRow}>
-          <Text style={styles.mainTitle}>PROFIL</Text>
-          <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsBtn}>
-            <Text style={styles.settingsIcon}>⚙️</Text>
-          </TouchableOpacity>
-        </View>
+      {/* 🛡️ AJOUT DU KEYBOARD AVOIDING VIEW ICI */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          
+          <View style={styles.headerRow}>
+            <Text style={styles.mainTitle}>PROFIL</Text>
+            <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.settingsBtn}>
+              <Text style={styles.settingsIcon}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* SECTION 1 : CARTE D'IDENTITÉ */}
-        <View style={[styles.card, { borderColor: `${r.c}33` }]}>
-          <View style={styles.badgeContainer}><RankBadge level={player.level} size="lg" /></View>
-          <View style={styles.infoBox}>
-            {editName ? (
-              <View style={styles.editRow}>
-                <TextInput style={styles.input} value={name} onChangeText={setName} maxLength={20} autoFocus />
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveName}><Text style={styles.saveBtnText}>✓</Text></TouchableOpacity>
+          <View style={[styles.card, { borderColor: `${r.c}33` }]}>
+            <View style={styles.badgeContainer}><RankBadge level={player.level} size="lg" /></View>
+            <View style={styles.infoBox}>
+              {editName ? (
+                <View style={styles.editRow}>
+                  <TextInput style={styles.input} value={name} onChangeText={setName} maxLength={20} autoFocus />
+                  <TouchableOpacity style={styles.saveBtn} onPress={handleSaveName}><Text style={styles.saveBtnText}>✓</Text></TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.nameRow}>
+                  <Text style={[styles.name, { color: r.c }]}>{player.name}</Text>
+                  <TouchableOpacity onPress={() => setEditName(true)} style={styles.editBtn}><Text style={styles.editIcon}>✏️</Text></TouchableOpacity>
+                </View>
+              )}
+              <Text style={styles.subText}>Rang {r.n} · Niveau {player.level}</Text>
+              <Text style={styles.streakText}>🔥 {player.streak} jour{player.streak > 1 ? 's' : ''} de streak</Text>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>TITRE ACTIF</Text>
+            </View>
+            <View style={styles.titlesGrid}>
+              {player.titles.map((t, i) => {
+                const isActive = player.activeTitle === t || (!player.activeTitle && i === 0);
+                return (
+                  <TouchableOpacity 
+                    key={i} 
+                    activeOpacity={0.7}
+                    onPress={() => onUpdateProfile({ activeTitle: t })}
+                    style={[styles.titleBadge, isActive && styles.titleBadgeActive]}
+                  >
+                    <Text style={[styles.titleText, isActive && styles.titleTextActive]}>
+                      {t} {isActive && "✓"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>LE RÉCEPTACLE</Text>
+              <TouchableOpacity onPress={editPhys ? handleSavePhys : () => setEditPhys(true)}>
+                <Text style={styles.editIcon}>{editPhys ? "✅" : "✏️"}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.physGrid}>
+              <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
+                <Text style={styles.physLabel}>{editPhys ? "Naissance" : "Âge"}</Text>
+                {editPhys ? (
+                  <TextInput style={styles.physInput} value={phys.dob} onChangeText={handleDobChange} keyboardType="numeric" maxLength={10} placeholder="JJ/MM/AAAA" placeholderTextColor={THEME.dim} />
+                ) : <Text style={styles.physValue}>{getAge(player.dob)} <Text style={styles.physUnit}>ans</Text></Text>}
               </View>
-            ) : (
-              <View style={styles.nameRow}>
-                <Text style={[styles.name, { color: r.c }]}>{player.name}</Text>
-                <TouchableOpacity onPress={() => setEditName(true)} style={styles.editBtn}><Text style={styles.editIcon}>✏️</Text></TouchableOpacity>
+              <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
+                <Text style={styles.physLabel}>Poids</Text>
+                {editPhys ? (
+                  <TextInput style={styles.physInput} value={phys.weight} onChangeText={t => setPhys({...phys, weight: t})} keyboardType="numeric" maxLength={3} placeholder="ex: 75" placeholderTextColor={THEME.dim} />
+                ) : <Text style={styles.physValue}>{player.weight || "?"} <Text style={styles.physUnit}>kg</Text></Text>}
+              </View>
+              <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
+                <Text style={styles.physLabel}>Taille</Text>
+                {editPhys ? (
+                  <TextInput style={styles.physInput} value={phys.height} onChangeText={t => setPhys({...phys, height: t})} keyboardType="numeric" maxLength={3} placeholder="ex: 180" placeholderTextColor={THEME.dim} />
+                ) : <Text style={styles.physValue}>{player.height || "?"} <Text style={styles.physUnit}>cm</Text></Text>}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>MINDSET & MODE DE VIE</Text>
+              <TouchableOpacity onPress={editMind ? handleSaveMind : () => setEditMind(true)}>
+                <Text style={styles.editIcon}>{editMind ? "✅" : "✏️"}</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.mindList}>
+              <View style={styles.mindItem}>
+                <Text style={styles.mindLabel}>Niveau d'activité (Travail/Études) :</Text>
+                {editMind ? (
+                  <MultiSelectionBox value={mind.sedentary} onChange={t => setMind({...mind, sedentary: t})} options={PRESETS.sedentary} />
+                ) : <Text style={styles.mindValue}>{player.sedentary || "Non spécifié"}</Text>}
+              </View>
+
+              <View style={styles.mindItem}>
+                <Text style={styles.mindLabel}>Points faibles psychologiques :</Text>
+                {editMind ? (
+                  <MultiSelectionBox value={mind.weakness} onChange={t => setMind({...mind, weakness: t})} options={PRESETS.weakness} />
+                ) : <Text style={styles.mindValue}>{player.weakness || "Non spécifié"}</Text>}
+              </View>
+
+              <View style={styles.mindItem}>
+                <Text style={styles.mindLabel}>Centres d'intérêt / Passions :</Text>
+                {editMind ? (
+                  <MultiSelectionBox value={mind.interests} onChange={t => setMind({...mind, interests: t})} options={PRESETS.interests} />
+                ) : <Text style={styles.mindValue}>{player.interests || "Non spécifié"}</Text>}
+              </View>
+
+              <View style={styles.mindItem}>
+                <Text style={styles.mindLabel}>Rythme biologique :</Text>
+                {editMind ? (
+                  <MultiSelectionBox value={mind.chronotype} onChange={t => setMind({...mind, chronotype: t})} options={PRESETS.chronotype} />
+                ) : <Text style={styles.mindValue}>{player.chronotype || "Non spécifié"}</Text>}
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderStats}>
+              <Text style={styles.sectionTitle}>STATS DÉTAILLÉES</Text>
+              <Text style={styles.hintText}>(Appui long pour voir l'historique)</Text>
+            </View>
+            
+            <View style={styles.statsGrid}>
+              {STATS.map(s => {
+                const isExpanded = expandedStat === s.k;
+                return (
+                  <TouchableOpacity 
+                    key={s.k} 
+                    activeOpacity={0.7}
+                    delayLongPress={300}
+                    onLongPress={() => setExpandedStat(isExpanded ? null : s.k)}
+                    style={[
+                      styles.statBox, 
+                      { 
+                        borderColor: isExpanded ? s.c : `${s.c}18`,
+                        backgroundColor: isExpanded ? `${s.c}15` : 'rgba(255,255,255,.025)'
+                      }
+                    ]}
+                  >
+                    <Text style={styles.statIcon}>{s.i}</Text>
+                    <Text style={[styles.statValue, { color: s.c }]}>{player.stats[s.k]}</Text>
+                    <Text style={styles.statLabel}>{s.l}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {expandedStat && (
+              <View style={[styles.historyPanel, { borderColor: STATS.find(s => s.k === expandedStat).c }]}>
+                <View style={styles.historyHeader}>
+                  <Text style={[styles.historyTitle, { color: STATS.find(s => s.k === expandedStat).c }]}>
+                    Quêtes du jour ({STATS.find(s => s.k === expandedStat).l})
+                  </Text>
+                  <TouchableOpacity onPress={() => setExpandedStat(null)}>
+                    <Text style={styles.historyClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {getStatHistory(expandedStat).length === 0 ? (
+                  <Text style={styles.historyEmpty}>Aucune quête validée pour cette stat aujourd'hui.</Text>
+                ) : (
+                  getStatHistory(expandedStat).map(q => (
+                    <View key={q.id} style={styles.historyItem}>
+                      <Text style={styles.historyItemTitle} numberOfLines={1}>✓ {q.title}</Text>
+                      <Text style={styles.historyItemXp}>+{DXP[q.diff] || 60} XP</Text>
+                    </View>
+                  ))
+                )}
               </View>
             )}
-            <Text style={styles.subText}>Rang {r.n} · Niveau {player.level}</Text>
-            <Text style={styles.streakText}>🔥 {player.streak} jour{player.streak > 1 ? 's' : ''} de streak</Text>
           </View>
-        </View>
-
-        {/* SECTION 1.5 : TITRES DÉBLOQUÉS (NOUVEAU) */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>TITRE ACTIF</Text>
-          </View>
-          <View style={styles.titlesGrid}>
-            {player.titles.map((t, i) => {
-              const isActive = player.activeTitle === t || (!player.activeTitle && i === 0);
-              return (
-                <TouchableOpacity 
-                  key={i} 
-                  activeOpacity={0.7}
-                  onPress={() => onUpdateProfile({ activeTitle: t })}
-                  style={[styles.titleBadge, isActive && styles.titleBadgeActive]}
-                >
-                  <Text style={[styles.titleText, isActive && styles.titleTextActive]}>
-                    {t} {isActive && "✓"}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* SECTION 2 : LE RÉCEPTACLE */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>LE RÉCEPTACLE</Text>
-            <TouchableOpacity onPress={editPhys ? handleSavePhys : () => setEditPhys(true)}>
-              <Text style={styles.editIcon}>{editPhys ? "✅" : "✏️"}</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.physGrid}>
-            <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
-              <Text style={styles.physLabel}>{editPhys ? "Naissance" : "Âge"}</Text>
-              {editPhys ? (
-                <TextInput style={styles.physInput} value={phys.dob} onChangeText={handleDobChange} keyboardType="numeric" maxLength={10} placeholder="JJ/MM/AAAA" placeholderTextColor={THEME.dim} />
-              ) : <Text style={styles.physValue}>{getAge(player.dob)} <Text style={styles.physUnit}>ans</Text></Text>}
-            </View>
-            <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
-              <Text style={styles.physLabel}>Poids</Text>
-              {editPhys ? (
-                <TextInput style={styles.physInput} value={phys.weight} onChangeText={t => setPhys({...phys, weight: t})} keyboardType="numeric" maxLength={3} placeholder="ex: 75" placeholderTextColor={THEME.dim} />
-              ) : <Text style={styles.physValue}>{player.weight || "?"} <Text style={styles.physUnit}>kg</Text></Text>}
-            </View>
-            <View style={[styles.physBox, { borderColor: 'rgba(6,182,212,.18)' }]}>
-              <Text style={styles.physLabel}>Taille</Text>
-              {editPhys ? (
-                <TextInput style={styles.physInput} value={phys.height} onChangeText={t => setPhys({...phys, height: t})} keyboardType="numeric" maxLength={3} placeholder="ex: 180" placeholderTextColor={THEME.dim} />
-              ) : <Text style={styles.physValue}>{player.height || "?"} <Text style={styles.physUnit}>cm</Text></Text>}
-            </View>
-          </View>
-        </View>
-
-        {/* SECTION 3 : MINDSET & MODE DE VIE */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>MINDSET & MODE DE VIE</Text>
-            <TouchableOpacity onPress={editMind ? handleSaveMind : () => setEditMind(true)}>
-              <Text style={styles.editIcon}>{editMind ? "✅" : "✏️"}</Text>
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.mindList}>
-            <View style={styles.mindItem}>
-              <Text style={styles.mindLabel}>Niveau d'activité (Travail/Études) :</Text>
-              {editMind ? (
-                <MultiSelectionBox value={mind.sedentary} onChange={t => setMind({...mind, sedentary: t})} options={PRESETS.sedentary} />
-              ) : <Text style={styles.mindValue}>{player.sedentary || "Non spécifié"}</Text>}
-            </View>
-
-            <View style={styles.mindItem}>
-              <Text style={styles.mindLabel}>Points faibles psychologiques :</Text>
-              {editMind ? (
-                <MultiSelectionBox value={mind.weakness} onChange={t => setMind({...mind, weakness: t})} options={PRESETS.weakness} />
-              ) : <Text style={styles.mindValue}>{player.weakness || "Non spécifié"}</Text>}
-            </View>
-
-            <View style={styles.mindItem}>
-              <Text style={styles.mindLabel}>Centres d'intérêt / Passions :</Text>
-              {editMind ? (
-                <MultiSelectionBox value={mind.interests} onChange={t => setMind({...mind, interests: t})} options={PRESETS.interests} />
-              ) : <Text style={styles.mindValue}>{player.interests || "Non spécifié"}</Text>}
-            </View>
-
-            <View style={styles.mindItem}>
-              <Text style={styles.mindLabel}>Rythme biologique :</Text>
-              {editMind ? (
-                <MultiSelectionBox value={mind.chronotype} onChange={t => setMind({...mind, chronotype: t})} options={PRESETS.chronotype} />
-              ) : <Text style={styles.mindValue}>{player.chronotype || "Non spécifié"}</Text>}
-            </View>
-          </View>
-        </View>
-
-        {/* SECTION 4 : STATS DÉTAILLÉES */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderStats}>
-            <Text style={styles.sectionTitle}>STATS DÉTAILLÉES</Text>
-            <Text style={styles.hintText}>(Appui long pour voir l'historique)</Text>
-          </View>
-          
-          <View style={styles.statsGrid}>
-            {STATS.map(s => {
-              const isExpanded = expandedStat === s.k;
-              return (
-                <TouchableOpacity 
-                  key={s.k} 
-                  activeOpacity={0.7}
-                  delayLongPress={300}
-                  onLongPress={() => setExpandedStat(isExpanded ? null : s.k)}
-                  style={[
-                    styles.statBox, 
-                    { 
-                      borderColor: isExpanded ? s.c : `${s.c}18`,
-                      backgroundColor: isExpanded ? `${s.c}15` : 'rgba(255,255,255,.025)'
-                    }
-                  ]}
-                >
-                  <Text style={styles.statIcon}>{s.i}</Text>
-                  <Text style={[styles.statValue, { color: s.c }]}>{player.stats[s.k]}</Text>
-                  <Text style={styles.statLabel}>{s.l}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {expandedStat && (
-            <View style={[styles.historyPanel, { borderColor: STATS.find(s => s.k === expandedStat).c }]}>
-              <View style={styles.historyHeader}>
-                <Text style={[styles.historyTitle, { color: STATS.find(s => s.k === expandedStat).c }]}>
-                  Quêtes du jour ({STATS.find(s => s.k === expandedStat).l})
-                </Text>
-                <TouchableOpacity onPress={() => setExpandedStat(null)}>
-                  <Text style={styles.historyClose}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              {getStatHistory(expandedStat).length === 0 ? (
-                <Text style={styles.historyEmpty}>Aucune quête validée pour cette stat aujourd'hui.</Text>
-              ) : (
-                getStatHistory(expandedStat).map(q => (
-                  <View key={q.id} style={styles.historyItem}>
-                    <Text style={styles.historyItemTitle} numberOfLines={1}>✓ {q.title}</Text>
-                    <Text style={styles.historyItemXp}>+{DXP[q.diff] || 60} XP</Text>
-                  </View>
-                ))
-              )}
-            </View>
-          )}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 };
@@ -364,13 +358,11 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, paddingBottom: 100 },
   
-  // ⚙️ NOUVEAUX STYLES POUR L'EN-TÊTE
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
   mainTitle: { fontSize: 20, fontWeight: 'bold', color: THEME.text },
   settingsBtn: { padding: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
   settingsIcon: { fontSize: 18 },
 
-  // ⚙️ NOUVEAUX STYLES POUR LE MENU PARAMÈTRES
   settingsOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-start', alignItems: 'flex-end', padding: 20, paddingTop: 60 },
   settingsMenu: { backgroundColor: THEME.surface, borderWidth: 1, borderColor: THEME.cyan, borderRadius: 16, padding: 18, width: 240, elevation: 10 },
   settingsMenuTitle: { color: THEME.dim, fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 18, textAlign: 'center' },

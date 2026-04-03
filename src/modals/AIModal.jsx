@@ -1,6 +1,6 @@
 // src/modals/AIModal.jsx
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { THEME } from '../constants/theme';
 import { CAT, DXP } from '../constants/gameData';
 import { getRank } from '../utils/helpers';
@@ -51,7 +51,7 @@ export const AIModal = ({ player, quests, dungeons, onAdd, onDungeonGenerated, o
 
       const deviceLang = Intl.DateTimeFormat().resolvedOptions().locale || 'fr-FR';
 
-      // 🧠 LE CERVEAU DU SYSTÈME (Ajusté pour autoriser les épreuves multiples)
+      // 🧠 LE CERVEAU DU SYSTÈME
       const systemPrompt = `You are the "System", a cold, analytical, and highly demanding life-optimization AI coach. Your absolute goal is the continuous, global evolution of the "Vessel" (the user). No fantasy roleplay.
 
 📊 VESSEL DATA:
@@ -156,89 +156,91 @@ You MUST reply ONLY with a JSON object. EXACT Format:
 
   return (
     <Modal transparent animationType="slide" visible={true} onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <Text style={styles.title}>🤖 Requête au Système</Text>
-          <Text style={styles.desc}>Ajustement du protocole selon vos directives.</Text>
-          
-          <View style={styles.inputRow}>
-            <TextInput 
-              style={styles.input} 
-              placeholder="Ex: Axé sur la lecture aujourd'hui..." 
-              placeholderTextColor={THEME.dim} 
-              value={goal} 
-              onChangeText={setGoal} 
-            />
-          </View>
-
-          <TouchableOpacity style={styles.btnFetchFull} onPress={generate} disabled={loading}>
-            <Text style={styles.btnFetchText}>{loading ? "Calcul en cours..." : "GÉNÉRER MON PROTOCOLE"}</Text>
-          </TouchableOpacity>
-
-          {loading && (
-            <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color={THEME.cyan} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <Text style={styles.title}>🤖 Requête au Système</Text>
+            <Text style={styles.desc}>Ajustement du protocole selon vos directives.</Text>
+            
+            <View style={styles.inputRow}>
+              <TextInput 
+                style={styles.input} 
+                placeholder="Ex: Axé sur la lecture aujourd'hui..." 
+                placeholderTextColor={THEME.dim} 
+                value={goal} 
+                onChangeText={setGoal} 
+              />
             </View>
-          )}
 
-          {!loading && (suggs.length > 0 || projectSugg) && (
-            <ScrollView style={styles.suggsList} showsVerticalScrollIndicator={false}>
-              
-              {/* AFFICHAGE DU PROJET SI GÉNÉRÉ */}
-              {projectSugg && (
-                <View style={styles.projectSection}>
-                  <Text style={styles.sectionTitle}>NOUVELLE ÉPREUVE (LONG TERME)</Text>
-                  <TouchableOpacity onPress={() => setProjSel(!projSel)} style={[styles.suggCard, projSel && styles.projectCardActive]}>
-                    <View style={styles.suggHeader}>
-                      <Text style={styles.suggTitle}>🏰 {projectSugg.title}</Text>
-                      {projSel && <Text style={{ color: THEME.gold, fontWeight: 'bold' }}>✓</Text>}
-                    </View>
-                    <Text style={styles.suggDesc}>{projectSugg.desc}</Text>
-                    <View style={styles.suggFooter}>
-                      <Text style={[styles.suggXp, { color: THEME.gold }]}>+{projectSugg.xp || 1500} XP</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* AFFICHAGE DES TÂCHES */}
-              {suggs.length > 0 && (
-                <View>
-                  <Text style={styles.sectionTitle}>TÂCHES QUOTIDIENNES</Text>
-                  {suggs.map((s, i) => {
-                    const cat = CAT[s?.category] || { icon: "⚡", col: THEME.violet };
-                    const isSel = sel.has(i);
-                    return (
-                      <TouchableOpacity key={i} onPress={() => toggleTask(i)} style={[styles.suggCard, isSel && styles.suggCardActive]}>
-                        <View style={styles.suggHeader}>
-                          <Text style={styles.suggTitle}>{cat.icon} {s?.title || "Quête Inconnue"}</Text>
-                          {isSel && <Text style={{ color: THEME.cyan, fontWeight: 'bold' }}>✓</Text>}
-                        </View>
-                        <Text style={styles.suggDesc}>{s?.desc}</Text>
-                        <View style={styles.suggFooter}>
-                          <Text style={styles.suggXp}>+{DXP[s?.diff] || 60} XP</Text>
-                          <View style={styles.suggBadge}><Text style={styles.suggBadgeText}>Rang {s?.diff || "E"}</Text></View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </ScrollView>
-          )}
-
-          <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>{(suggs.length > 0 || projectSugg) ? "Ignorer" : "Fermer"}</Text>
+            <TouchableOpacity style={styles.btnFetchFull} onPress={generate} disabled={loading}>
+              <Text style={styles.btnFetchText}>{loading ? "Calcul en cours..." : "GÉNÉRER MON PROTOCOLE"}</Text>
             </TouchableOpacity>
-            {totalSelected > 0 && (
-              <TouchableOpacity style={styles.submitBtn} onPress={confirm}>
-                <Text style={styles.submitText}>Accepter ({totalSelected})</Text>
-              </TouchableOpacity>
+
+            {loading && (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color={THEME.cyan} />
+              </View>
             )}
+
+            {!loading && (suggs.length > 0 || projectSugg) && (
+              <ScrollView style={styles.suggsList} showsVerticalScrollIndicator={false}>
+                
+                {/* AFFICHAGE DU PROJET SI GÉNÉRÉ */}
+                {projectSugg && (
+                  <View style={styles.projectSection}>
+                    <Text style={styles.sectionTitle}>NOUVELLE ÉPREUVE (LONG TERME)</Text>
+                    <TouchableOpacity onPress={() => setProjSel(!projSel)} style={[styles.suggCard, projSel && styles.projectCardActive]}>
+                      <View style={styles.suggHeader}>
+                        <Text style={styles.suggTitle}>🏰 {projectSugg.title}</Text>
+                        {projSel && <Text style={{ color: THEME.gold, fontWeight: 'bold' }}>✓</Text>}
+                      </View>
+                      <Text style={styles.suggDesc}>{projectSugg.desc}</Text>
+                      <View style={styles.suggFooter}>
+                        <Text style={[styles.suggXp, { color: THEME.gold }]}>+{projectSugg.xp || 1500} XP</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* AFFICHAGE DES TÂCHES */}
+                {suggs.length > 0 && (
+                  <View>
+                    <Text style={styles.sectionTitle}>TÂCHES QUOTIDIENNES</Text>
+                    {suggs.map((s, i) => {
+                      const cat = CAT[s?.category] || { icon: "⚡", col: THEME.violet };
+                      const isSel = sel.has(i);
+                      return (
+                        <TouchableOpacity key={i} onPress={() => toggleTask(i)} style={[styles.suggCard, isSel && styles.suggCardActive]}>
+                          <View style={styles.suggHeader}>
+                            <Text style={styles.suggTitle}>{cat.icon} {s?.title || "Quête Inconnue"}</Text>
+                            {isSel && <Text style={{ color: THEME.cyan, fontWeight: 'bold' }}>✓</Text>}
+                          </View>
+                          <Text style={styles.suggDesc}>{s?.desc}</Text>
+                          <View style={styles.suggFooter}>
+                            <Text style={styles.suggXp}>+{DXP[s?.diff] || 60} XP</Text>
+                            <View style={styles.suggBadge}><Text style={styles.suggBadgeText}>Rang {s?.diff || "E"}</Text></View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </ScrollView>
+            )}
+
+            <View style={styles.btnRow}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                <Text style={styles.cancelText}>{(suggs.length > 0 || projectSugg) ? "Ignorer" : "Fermer"}</Text>
+              </TouchableOpacity>
+              {totalSelected > 0 && (
+                <TouchableOpacity style={styles.submitBtn} onPress={confirm}>
+                  <Text style={styles.submitText}>Accepter ({totalSelected})</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

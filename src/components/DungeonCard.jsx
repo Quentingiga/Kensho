@@ -1,11 +1,38 @@
 // src/components/DungeonCard.jsx
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { THEME } from '../constants/theme';
 
-export const DungeonCard = ({ d, onUpdate }) => {
+export const DungeonCard = ({ d, onUpdate, onDelete }) => {
   const [open, setOpen] = useState(false);
-  const [v, setV] = useState(d.progress.toString());
+  const [v, setV] = useState(String(d.progress || 0));
+
+  // Synchronise le champ avec la valeur réelle si elle change ailleurs
+  useEffect(() => {
+    setV(String(d.progress || 0));
+  }, [d.progress]);
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Abandonner le Donjon",
+      "Es-tu sûr de vouloir supprimer cet objectif ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        { text: "Supprimer", style: "destructive", onPress: () => onDelete(d.id) }
+      ]
+    );
+  };
+
+  const handleConfirm = () => {
+    // Sécurise la valeur tapée (évite les bugs si on tape des espaces)
+    let newProgress = parseInt(v.replace(/[^0-9]/g, ''), 10);
+    if (isNaN(newProgress)) newProgress = 0;
+    if (newProgress > 100) newProgress = 100;
+    
+    // Envoie la mise à jour à App.jsx
+    onUpdate(d.id, newProgress);
+    setOpen(false);
+  };
 
   return (
     <View style={styles.card}>
@@ -43,18 +70,22 @@ export const DungeonCard = ({ d, onUpdate }) => {
             <Text style={{color: THEME.text}}>Nouveau % :</Text>
             <TextInput
               style={styles.input}
-              keyboardType="numeric"
+              keyboardType="number-pad"
               value={v}
               onChangeText={setV}
               maxLength={3}
             />
           </View>
-          <TouchableOpacity 
-            style={styles.confirmBtn} 
-            onPress={() => { onUpdate(d.id, parseInt(v) || 0); setOpen(false); }}
-          >
-            <Text style={styles.confirmText}>Confirmer</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+              <Text style={styles.deleteText}>🗑️ Supprimer</Text>
+            </TouchableOpacity>
+            
+            {/* 🎯 LE BOUTON CONFIRMER SÉCURISÉ */}
+            <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
+              <Text style={styles.confirmText}>Confirmer</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -79,8 +110,11 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: '#0e7490', paddingHorizontal: 13, paddingVertical: 5, borderRadius: 20 },
   btnText: { color: 'white', fontSize: 11, fontWeight: 'bold' },
   updateBox: { marginTop: 11, padding: 12, backgroundColor: 'rgba(255,255,255,.025)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(124,58,237,.18)' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
   input: { backgroundColor: 'rgba(0,0,0,0.5)', color: 'white', padding: 8, borderRadius: 5, width: 60, textAlign: 'center', borderWidth: 1, borderColor: THEME.violet },
-  confirmBtn: { backgroundColor: THEME.violet, padding: 9, borderRadius: 8, alignItems: 'center' },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  deleteBtn: { flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: '#ef4444', padding: 9, borderRadius: 8, alignItems: 'center' },
+  deleteText: { color: '#ef4444', fontWeight: 'bold', fontSize: 13 },
+  confirmBtn: { flex: 1, backgroundColor: THEME.violet, padding: 9, borderRadius: 8, alignItems: 'center' },
   confirmText: { color: 'white', fontWeight: 'bold' }
 });

@@ -1,6 +1,6 @@
 // src/modals/AddDungeonModal.jsx
 import React, { useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { THEME } from '../constants/theme';
 
 export const AddDungeonModal = ({ onAdd, onClose }) => {
@@ -9,26 +9,28 @@ export const AddDungeonModal = ({ onAdd, onClose }) => {
 
   return (
     <Modal transparent animationType="slide" visible={true} onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          <Text style={styles.title}>🏰 Nouveau Donjon</Text>
-          
-          <TextInput style={styles.input} placeholder="Objectif (ex: Courir 5km)" placeholderTextColor={THEME.dim} value={f.title} onChangeText={t => set("title", t)} />
-          <TextInput style={[styles.input, styles.textArea]} placeholder="Description" placeholderTextColor={THEME.dim} value={f.desc} onChangeText={t => set("desc", t)} multiline />
-          
-          <Text style={styles.label}>Récompense XP</Text>
-          <TextInput style={styles.input} placeholder="Ex: 500" placeholderTextColor={THEME.dim} value={f.xp} onChangeText={t => set("xp", t)} keyboardType="numeric" />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <Text style={styles.title}>🏰 Nouveau Donjon</Text>
+            
+            <TextInput style={styles.input} placeholder="Objectif (ex: Courir 5km)" placeholderTextColor={THEME.dim} value={f.title} onChangeText={t => set("title", t)} />
+            <TextInput style={[styles.input, styles.textArea]} placeholder="Description" placeholderTextColor={THEME.dim} value={f.desc} onChangeText={t => set("desc", t)} multiline />
+            
+            <Text style={styles.label}>Récompense XP</Text>
+            <TextInput style={styles.input} placeholder="Ex: 500" placeholderTextColor={THEME.dim} value={f.xp} onChangeText={t => set("xp", t)} keyboardType="numeric" />
 
-          <View style={styles.btnRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-              <Text style={styles.cancelText}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.submitBtn} onPress={() => { if(f.title.trim()) { onAdd({ ...f, xp: parseInt(f.xp) || 500 }); onClose(); }}}>
-              <Text style={styles.submitText}>Ouvrir le donjon</Text>
-            </TouchableOpacity>
+            <View style={styles.btnRow}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                <Text style={styles.cancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.submitBtn} onPress={() => { if(f.title.trim()) { onAdd({ ...f, xp: parseInt(f.xp) || 500 }); onClose(); }}}>
+                <Text style={styles.submitText}>Ouvrir le donjon</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
