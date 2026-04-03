@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, StatusBar, Text, AppState } from 'react-native';
+import { View, StyleSheet, StatusBar, Text, AppState, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import PagerView from 'react-native-pager-view';
 
 // --- IMPORT WIDGET ---
-import { requestWidgetUpdate, registerWidgetTaskHandler } from 'react-native-android-widget';
-import { widgetTaskHandler } from './src/widget/widgetTask';
+import { requestWidgetUpdate } from 'react-native-android-widget';
 import { SystemWidget } from './src/widget/SystemWidget';
 
 // --- IMPORTS DE NOTRE ARCHITECTURE ---
@@ -34,7 +33,8 @@ import { AddDungeonModal } from './src/modals/AddDungeonModal';
 import { AIModal } from './src/modals/AIModal';
 import { LevelUpOverlay } from './src/modals/LevelUpOverlay';
 
-import { registerSystemNotifications, schedulePenaltyWarning, cancelSystemWarning } from './src/utils/notifications';
+// --- IMPORTS NOTIFICATIONS (Nettoyé) ---
+import { registerSystemNotifications, updateSystemNotifications, schedulePenaltyWarning, cancelSystemWarning } from './src/utils/notifications';
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -65,7 +65,6 @@ export default function App() {
     registerSystemNotifications();
 
     const checkAuth = async () => {
-      // 🛠️ MODE DEBUG : Auto-connexion magique pour le dev
       if (process.env.EXPO_PUBLIC_BYPASS_AUTH === 'true') {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: process.env.EXPO_PUBLIC_TEST_EMAIL,
@@ -76,13 +75,12 @@ export default function App() {
           console.log("🛠️ DEBUG MODE : Chasseur connecté automatiquement.");
           setSession(data.session);
           setIsAuthChecking(false);
-          return; // On arrête là pour ne pas faire la suite
+          return;
         } else if (error) {
           console.log("🛠️ Erreur Auto-Login :", error.message);
         }
       }
 
-      // 👤 FLUX NORMAL (Si pas en debug, ou si l'auto-login a échoué)
       supabase.auth.getSession().then(({ data: { session } }) => {
         setSession(session);
         setIsAuthChecking(false);
@@ -104,7 +102,6 @@ export default function App() {
 
     (async () => {
       try {
-        // On télécharge les 3 tables en parallèle pour aller plus vite
         const [pRes, qRes, dRes] = await Promise.all([
           supabase.from('players').select('*').eq('id', session.user.id).single(),
           supabase.from('quests').select('*').eq('user_id', session.user.id),
@@ -115,7 +112,6 @@ export default function App() {
         let q = INIT_QUESTS;
         let d = INIT_DUNGEONS;
 
-        // --- MAPPING DU JOUEUR ---
         if (pRes.data) {
           const dbP = pRes.data;
           p = {
@@ -130,7 +126,6 @@ export default function App() {
           p = await stLoad("sl_p", DEF_PLAYER);
         }
 
-        // --- MAPPING DES QUÊTES ---
         if (qRes.data && qRes.data.length > 0) {
           q = qRes.data.map(dbQ => ({
             id: dbQ.id, title: dbQ.title, category: dbQ.category, diff: dbQ.diff,
@@ -141,7 +136,6 @@ export default function App() {
           q = Array.isArray(localQuests) ? localQuests : INIT_QUESTS;
         }
 
-        // --- MAPPING DES DONJONS ---
         if (dRes.data && dRes.data.length > 0) {
           d = dRes.data.map(dbD => ({
             id: dbD.id, title: dbD.title, desc: dbD.description, xp: dbD.xp, progress: dbD.progress, done: dbD.done
@@ -150,14 +144,11 @@ export default function App() {
           d = await stLoad("sl_d", INIT_DUNGEONS);
         }
 
-        // Reset quotidien des quêtes
-        // Reset quotidien des quêtes
         const td = todayStr();
         let fq = q;
         let newPenalty = null;
 
         if (p.lastDate && p.lastDate !== td) {
-          // 1. CALCUL DE LA PÉNALITÉ (avant de remettre les quêtes à zéro)
           const unfinished = q.filter(x => !x.done);
           if (unfinished.length > 0) {
             let totalXp = 0;
@@ -171,13 +162,11 @@ export default function App() {
             newPenalty = { xp: totalXp, stats: statsLost, count: unfinished.length };
           }
 
-          // 2. RÉINITIALISATION DES QUÊTES ET DU STREAK
           fq = q.map(x => ({ ...x, done: false }));
           const yesterday = new Date();
           yesterday.setDate(yesterday.getDate() - 1);
           const wasYesterday = p.lastDate === yesterday.toDateString();
           
-          // 🛡️ CORRECTION : Le streak augmente SEULEMENT si connecté hier ET aucune quête inachevée
           if (wasYesterday && unfinished.length === 0) {
             p.streak = (p.streak || 0) + 1;
           } else {
@@ -186,13 +175,13 @@ export default function App() {
           
           p.lastDate = td;
         } else if (!p.lastDate) {
-          p.lastDate = td; // Initialisation première ouverture
+          p.lastDate = td; 
         }
         
         setPlayer(p); 
         setQuests(Array.isArray(fq) ? fq : INIT_QUESTS); 
         setDungeons(Array.isArray(d) ? d : INIT_DUNGEONS); 
-        if (newPenalty) setPenaltyData(newPenalty); // 🔴 Affiche la modale si nécessaire
+        if (newPenalty) setPenaltyData(newPenalty); 
         setReady(true);
       } catch (e) {
         console.log("Erreur chargement:", e);
@@ -208,7 +197,6 @@ export default function App() {
     stSave("sl_q", quests);
     stSave("sl_d", dungeons);
 
-    // 📱 MISE À JOUR DU WIDGET
     const activeQuests = quests.filter(q => !q.done);
     const mappedTasks = activeQuests.map(q => ({
       title: q.title,
@@ -216,11 +204,8 @@ export default function App() {
       icon: CAT[q.category]?.icon || "🎯"
     }));
 
-    console.log("🛠️ [WIDGET] Demande de mise à jour manuelle...");
-
     requestWidgetUpdate({
       widgetName: 'SystemWidget',
-      // ⚠️ LA CORRECTION EST LÀ : Pas de () => devant le <SystemWidget />
       renderWidget: <SystemWidget player={player} tasks={mappedTasks} />,
     });
 
@@ -228,7 +213,6 @@ export default function App() {
       try {
         const userId = session.user.id;
 
-        // 1. Sauvegarde du Joueur
         await supabase.from('players').upsert({
           id: userId, name: player.name, level: player.level, xp: player.xp, streak: player.streak, last_date: player.lastDate,
           dob: player.dob, weight: player.weight, height: player.height,
@@ -238,7 +222,6 @@ export default function App() {
           active_title: player.activeTitle,
         });
 
-        // 2. Sauvegarde des Quêtes
         if (quests.length > 0) {
           const dbQuests = quests.map(q => ({
             id: q.id, user_id: userId, title: q.title, category: q.category, diff: q.diff,
@@ -247,7 +230,6 @@ export default function App() {
           await supabase.from('quests').upsert(dbQuests);
         }
         
-        // Nettoyage des quêtes supprimées localement
         const localQIds = quests.map(q => q.id);
         const { data: cloudQuests } = await supabase.from('quests').select('id').eq('user_id', userId);
         if (cloudQuests) {
@@ -255,7 +237,6 @@ export default function App() {
           if (toDeleteQ.length > 0) await supabase.from('quests').delete().in('id', toDeleteQ);
         }
 
-        // 3. Sauvegarde des Donjons
         if (dungeons.length > 0) {
           const dbDungeons = dungeons.map(d => ({
             id: d.id, user_id: userId, title: d.title, description: d.desc, xp: d.xp, progress: d.progress, done: d.done, updated_at: new Date()
@@ -263,7 +244,6 @@ export default function App() {
           await supabase.from('dungeons').upsert(dbDungeons);
         }
 
-        // Nettoyage des donjons supprimés
         const localDIds = dungeons.map(d => d.id);
         const { data: cloudDungeons } = await supabase.from('dungeons').select('id').eq('user_id', userId);
         if (cloudDungeons) {
@@ -274,33 +254,22 @@ export default function App() {
       } catch (err) {
         console.error("Erreur de synchro DB:", err);
       }
-    }, 2500); // 2.5 secondes de pause avant de synchroniser avec le Cloud pour éviter de spammer la base de données
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [player, quests, dungeons, ready, session]);
 
   // --- 2.5 SYSTÈME D'AVERTISSEMENT (NOTIFICATIONS) ---
   useEffect(() => {
-    if (!ready || quests.length === 0) return;
-
-    // On regarde si toutes les quêtes "daily" sont terminées
-    const allDailyDone = quests.filter(q => q.daily).every(q => q.done);
-
-    if (allDailyDone) {
-      // Le joueur a tout fait : le Système le laisse tranquille
-      cancelSystemWarning();
-    } else {
-      // Il reste des choses à faire : le Système prépare la notification pour 21h
-      schedulePenaltyWarning();
-    }
+    // Dès que le jeu est prêt, on envoie la liste des quêtes au Système
+    if (!ready) return;
+    updateSystemNotifications(quests);
   }, [quests, ready]);
 
   // --- FORCER LA MAJ DU WIDGET AU LANCEMENT / RETOUR AU PREMIER PLAN ---
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active' && ready) {
-        console.log("🛠️ [WIDGET] App ouverte, mise à jour forcée du Système !");
-        
         const activeQuests = quests.filter(q => !q.done);
         const mappedTasks = activeQuests.map(q => ({
           title: q.title,
@@ -364,7 +333,7 @@ export default function App() {
 
       return { ...p, xp: newXp, level: newLevel, stats: newStats, streak: 0 };
     });
-    setPenaltyData(null); // 🔴 Ferme la modale
+    setPenaltyData(null);
   }, []);
 
   const completeQuest = useCallback(id => {
@@ -409,6 +378,10 @@ export default function App() {
     }));
   }, [gainXP]);
 
+  const deleteDungeon = useCallback(id => { 
+    setDungeons(prev => prev.filter(d => d.id !== id)); 
+  }, []);
+
   // --- 4. AFFICHAGE ET SÉCURITÉ ---
   if (isAuthChecking) {
     return (
@@ -436,7 +409,7 @@ export default function App() {
       <PagerView style={styles.content} initialPage={0} ref={pagerRef} onPageSelected={(e) => setTab(TABS_ORDER[e.nativeEvent.position])}>
         <View key="0" style={{ flex: 1 }}><DashboardScreen player={player} onAI={() => setShowAI(true)} /></View>
         <View key="1" style={{ flex: 1 }}><QuestsScreen quests={quests} player={player} onComplete={completeQuest} onUndo={undoQuest} onDelete={deleteQuest} onAdd={() => setShowAQ(true)} onAI={() => setShowAI(true)} /></View>
-        <View key="2" style={{ flex: 1 }}><DungeonsScreen dungeons={dungeons} onUpdate={updateDungeon} onAdd={() => setShowAD(true)} /></View>
+        <View key="2" style={{ flex: 1 }}><DungeonsScreen dungeons={dungeons} onUpdate={updateDungeon} onDelete={deleteDungeon} onAdd={() => setShowAD(true)} /></View>
         <View key="3" style={{ flex: 1 }}><ProfileScreen player={player} quests={quests} onUpdateProfile={updates => setPlayer(p => ({ ...p, ...updates }))} /></View>
       </PagerView>
 
@@ -465,5 +438,5 @@ const styles = StyleSheet.create({
   content: { flex: 1, width: '100%' },
   loadingContainer: { flex: 1, backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center', width: '100%' },
   loadingIcon: { fontSize: 50, color: THEME.vlight, marginBottom: 20 },
-  loadingText: { color: THEME.vlight, letterSpacing: 3, fontWeight: 'bold' }
+  loadingText: { color: THEME.vlight, letterSpacing: 3, fontWeight: 'bold' },
 });
